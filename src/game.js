@@ -30,6 +30,7 @@ export function createGame(world) {
   const attackRange = () => classInfo()?.range ?? 27;
   let walkingToMentor = null, activeMentor = null, walkingToDoor = null;
   const outsideInCity = () => state.inPlaza && !state.inHospital;
+  const mentorIsHere = mentor => state.inPlaza && Boolean(mentor.hospital) === state.inHospital;
   const presence=createPresence();
   let hero, enemies, path = [], destination, clock = 0, previousFrame, manualUntil = 0, cooldown = 0, guard = 0,
       block = false, messages = [], effects = [], renderAt = 0, savedAt = 0, fightAt = 0, bossMode = false, hiddenSince = null;
@@ -49,6 +50,7 @@ export function createGame(world) {
   const unlockedBoss = () => state.kills[state.zone]>=nowMap().goal && !state.cleared[state.zone];
   function save() {
     state.savedAt = Date.now();
+    state.hp=hero.hp;
     try { localStorage.setItem(key, JSON.stringify(state)); }
     catch { storageOK = false; }
     savedAt = state.savedAt;
@@ -92,7 +94,8 @@ export function createGame(world) {
     if(!outsideInCity()) presence.stop();
     const citySpawn={x:city.spawn.x+Math.floor(Math.random()*7)*8-24,y:city.spawn.y};
     const spawn=spawnOverride ?? (inHospital ? hospital.spawn : inPlaza ? citySpawn : xy(nowMap().rally));
-    hero={...spawn,hp:health(),facing:1,direction:'down',gaitTime:0,moving:false,rest:0};
+    const hp=hero?.hp ?? state.hp;
+    hero={...spawn,hp:Number.isFinite(hp) && hp>0 ? Math.min(hp,health()) : health(),facing:1,direction:'down',gaitTime:0,moving:false,rest:0};
     enemies=inPlaza ? [] : nowMap().spawns.map((p,i)=>foe(p,i));
     destination=null;
     path=[];
@@ -220,7 +223,7 @@ export function createGame(world) {
   }
   function visitMentor(id) {
     const mentor=mentors.find(option=>option.id===id);
-    if(!outsideInCity() || activeMentor || !mentor) return;
+    if(!mentor || !mentorIsHere(mentor) || activeMentor) return;
     walkingToDoor=null;
     if(far(hero,mentor)<=28) return openMentor(mentor);
     walkingToMentor=mentor;
@@ -233,11 +236,19 @@ export function createGame(world) {
     publish();
   }
   function chooseClass(id) {
-    if(!state.inPlaza || state.classId || activeMentor?.id!==id || far(hero,activeMentor)>28) return;
+    if(state.classId || activeMentor?.id!==id || !mentorIsHere(activeMentor) || far(hero,activeMentor)>28) return;
+    const missingHp=health()-hero.hp;
     state.classId=id;
-    hero.hp=health();
+    hero.hp=health()-missingHp;
     log('Você escolheu a classe '+classInfo().name+' com '+activeMentor.label+'.');
     closeMentor();
+    save();
+    publish();
+  }
+  function healWithInoue() {
+    if(activeMentor?.id!=='inoue' || !mentorIsHere(activeMentor) || far(hero,activeMentor)>28 || hero.hp>=health()) return;
+    hero.hp=health();
+    log('Inoue recuperou todos os seus PV.');
     save();
     publish();
   }
@@ -365,7 +376,7 @@ export function createGame(world) {
       attackHero(e);
       if(clock<hero.rest) break;
     }
-    if(!enemy && clock>=hero.rest) hero.hp=Math.min(health(),hero.hp+dt*(3+state.level*.4));
+    if(!state.inPlaza && !enemy && clock>=hero.rest) hero.hp=Math.min(health(),hero.hp+dt*(3+state.level*.4));
   }
   function hurt(damage) {
     hero.hp=Math.max(0,hero.hp-damage);
@@ -457,7 +468,7 @@ export function createGame(world) {
       plazaCount:presence.players.length+1,
       map, zone:state.zone, unlocked:state.unlocked, cleared:[...state.cleared],
       auto:state.auto, bossMode, bossReady:unlockedBoss(), trail:Math.min(state.kills[state.zone],map.goal),
-      hp:Math.ceil(hero.hp), maxHp:health(), xp:state.xp, goalXp:need(), reishi:state.reishi,
+      hp:Math.ceil(hero.hp), maxHp:health(), needsHealing:hero.hp<health(), xp:state.xp, goalXp:need(), reishi:state.reishi,
       level:state.level, attack:attack(), str:state.str, vit:state.vit, points:state.points,
       classId:state.classId, classInfo:classInfo(), activeMentor, walkingToMentor:walkingToMentor?.id,
       form:state.classId==='shinigami' ? forms[state.form] : null, nextForm:['Shikai','Bankai','Liberado'][state.form],
@@ -567,7 +578,8 @@ export function createGame(world) {
         return;
       }
       walkingToDoor=null;
-      const mentor=outsideInCity() &&mentors.find(({x,y})=>Math.abs(x-point.x)<=37 && point.y>=y-50 && point.y<=y+12);
+      const mentor=mentors.find(guide=>mentorIsHere(guide) &&
+        Math.abs(guide.x-point.x)<=30 && point.y>=guide.y-50 && point.y<=guide.y+12);
       if(mentor) return visitMentor(mentor.id);
       walkingToMentor=null;
     }
@@ -652,7 +664,7 @@ export function createGame(world) {
       listeners.add(notify);
       return ()=>listeners.delete(notify);
     },
-    useHospitalDoor,visitMentor,closeMentor,chooseClass,addPoint,setGear,reinforce,openDistrict,openPlaza,toggleHunt,trackBoss,defend,useSkill,release,
+    useHospitalDoor,visitMentor,closeMentor,chooseClass,healWithInoue,addPoint,setGear,reinforce,openDistrict,openPlaza,toggleHunt,trackBoss,defend,useSkill,release,
     dispose() {
       cancelAnimationFrame(animationId);
       world.removeEventListener('pointerdown',pointAt);

@@ -137,7 +137,7 @@ function CharacterPanel({ view, game }) {
   </aside>;
 }
 
-function MentorDialog({ mentor, currentClass, game }) {
+function MentorDialog({ mentor, view, game }) {
   const dialog = useRef(null);
   useEffect(() => {
     const modal = dialog.current;
@@ -145,6 +145,8 @@ function MentorDialog({ mentor, currentClass, game }) {
     return () => modal.close();
   }, []);
   const option=classPaths[mentor.id];
+  const canTreat=mentor.id==='inoue';
+  const currentClass=view.classInfo;
   return <dialog ref={dialog} className="mentor-dialog" aria-labelledby="mentor-name" onCancel={event=>{
     event.preventDefault();
     game.closeMentor();
@@ -154,24 +156,27 @@ function MentorDialog({ mentor, currentClass, game }) {
       <h2 id="mentor-name">{mentor.name}</h2>
     </header>
     <p className="mentor-dialogue">{mentor.dialogue}</p>
-    <div className="mentor-class"><strong>{option.name}</strong><p>{option.style}</p></div>
+    {canTreat && <p className="mentor-vitals" role="status">{view.needsHealing ? `${view.hp} / ${view.maxHp} PV` : 'Vida completa'}</p>}
+    {!currentClass && <div className="mentor-class"><strong>{option.name}</strong><p>{option.style}</p></div>}
     <p className="mentor-choice-info">{currentClass ? 'Sua classe atual é '+currentClass.name+'.' : 'A escolha de classe é definitiva para este personagem.'}</p>
     <div className="mentor-actions">
       <button autoFocus type="button" className="button" onClick={game.closeMentor}>Fechar</button>
-      {!currentClass && <button type="button" className="button on" onClick={()=>game.chooseClass(mentor.id)}>Virar {option.name}</button>}
+      {canTreat && <button type="button" className="button on" disabled={!view.needsHealing} onClick={game.healWithInoue}>Curar</button>}
+      {!currentClass && <button type="button" className={canTreat ? 'button skill' : 'button on'} onClick={()=>game.chooseClass(mentor.id)}>Virar {option.name}</button>}
     </div>
   </dialog>;
 }
 
 function MentorDirectory({ view, game }) {
-  const walking=mentors.find(mentor=>mentor.id===view.walkingToMentor);
+  const available=mentors.filter(mentor=>Boolean(mentor.hospital)===view.inHospital);
+  const walking=available.find(mentor=>mentor.id===view.walkingToMentor);
   return <section className="mentor-directory" aria-labelledby="mentors-title">
     <div className="mentor-heading">
-      <h3 id="mentors-title">Mentores de Karakura</h3>
-      <p role="status">{walking ? 'Indo falar com '+walking.label+'…' : view.classId ? 'Visite os mentores pela praça.' : 'Converse com um mentor para escolher sua classe.'}</p>
+      <h3 id="mentors-title">{view.inHospital ? 'Mentores do hospital' : 'Mentores de Karakura'}</h3>
+      <p role="status">{walking ? 'Indo falar com '+walking.label+'…' : view.inHospital ? (view.classId ? 'Inoue pode recuperar seus PV.' : 'Converse com um mentor para escolher sua classe.') : 'Inoue, Sado e Ryūken estão no hospital.'}</p>
     </div>
     <div className="mentor-list">
-      {mentors.map(({id,label,place})=>{
+      {available.map(({id,label,place})=>{
         const option=classPaths[id];
         return <button key={id} type="button" className="mentor-card" style={{'--mentor-color':option.color}}
           aria-label={'Visitar '+label+' · '+option.name} onClick={()=>game.visitMentor(id)}>
@@ -180,7 +185,7 @@ function MentorDirectory({ view, game }) {
         </button>;
       })}
     </div>
-    {view.activeMentor && <MentorDialog mentor={view.activeMentor} currentClass={view.classInfo} game={game} />}
+    {view.activeMentor && <MentorDialog mentor={view.activeMentor} view={view} game={game} />}
   </section>;
 }
 
@@ -235,12 +240,13 @@ function App() {
           </div>}
         </div>
         <div className="viewport">
-          <canvas ref={world} width="544" height="306" tabIndex={0} aria-label={view?.inHospital ? "Hospital de Karakura. Use WASD para andar ou toque na saída."
+          <canvas ref={world} width="544" height="306" tabIndex={0} aria-label={view?.inHospital ? "Hospital de Karakura. Use WASD para andar, toque na saída ou selecione um mentor na lista."
             : view?.inPlaza ? "Praça Principal. Use WASD para andar, toque na porta do hospital ou selecione um mentor na lista." : "Mapa de patrulha. Toque ou use WASD para andar."} />
           <span className="risk" role="status" hidden={!view?.warning}>{view?.warning}</span>
           <span className="worldnote">{view?.inPlaza ? 'WASD ou toque · E na porta' : 'WASD ou toque para andar'}</span>
         </div>
-        {view && !view.inHospital && (view.inPlaza ? <PlazaControls view={view} game={game} /> : <PatrolControls view={view} game={game} />)}
+        {view && (view.inHospital ? <MentorDirectory view={view} game={game} />
+          : view.inPlaza ? <PlazaControls view={view} game={game} /> : <PatrolControls view={view} game={game} />)}
       </section>
       {view && <section className="panel diary"><h2>Diário da patrulha</h2>
         <ul>{view.messages.map((message,index) => <li key={message + index}>{message}</li>)}</ul>
