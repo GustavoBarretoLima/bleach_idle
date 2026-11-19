@@ -14,12 +14,12 @@ export const classPaths = {
 export const mentors = [
   {id:'shinigami', name:'Kisuke Urahara', label:'Urahara', place:'Loja Urahara', x:610, y:450, approachY:463,
     dialogue:'Se consegue sentir a pressão espiritual da cidade, já tem por onde começar. Passe na minha loja e vamos despertar sua lâmina.'},
-  {id:'quincy', name:'Ryūken Ishida', label:'Ryūken', place:'Clínica Ishida', x:716, y:451, approachY:463,
+  {id:'quincy', name:'Ryūken Ishida', label:'Ryūken', place:'Recepção', hospital:true, x:504, y:263, approachY:287,
     dialogue:'Uma flecha Quincy começa pela concentração. Posso ensinar você a reunir o Reishi ao seu redor e dar forma a ele.'},
-  {id:'sado', name:'Yasutora “Chad” Sado', label:'Sado', place:'Pátio de Treino', x:416, y:445, approachY:463,
+  {id:'sado', name:'Yasutora “Chad” Sado', label:'Sado', place:'Sala de espera', hospital:true, x:475, y:359, approachY:383,
     dialogue:'Força vale mais quando você tem alguém para proteger. Se quiser treinar comigo, começamos por aí.'},
-  {id:'inoue', name:'Orihime Inoue', label:'Inoue', place:'Jardim de Karakura', x:765, y:446, approachY:463,
-    dialogue:'Quando alguém se machuca, eu penso em como posso ajudar. Posso mostrar como meu escudo protege e recupera.'}
+  {id:'inoue', name:'Orihime Inoue', label:'Inoue', place:'Enfermaria', hospital:true, x:677, y:336, approachY:355,
+    dialogue:'Se você se machucou, posso cuidar dos seus ferimentos. Também posso ensinar você a usar o meu escudo.'}
 ];
 
 export function plazaWalkable(x,y) {

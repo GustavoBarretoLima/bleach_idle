@@ -66,3 +66,5 @@
 
 .hospital-door {background:#274844;border-color:#4d7970;color:#def5ed;flex:none}
 @media(max-width:400px){.hospital-door{font-size:12px;padding-inline:7px}}
+
+.mentor-vitals {color:var(--teal);font-weight:700;margin:0 0 10px}

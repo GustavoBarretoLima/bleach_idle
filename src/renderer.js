@@ -17,6 +17,9 @@ const propAtlas=loadTexture(propsUrl);
 const mentorAtlas=loadTexture(mentorsUrl);
 const bedSprite=loadTexture(bedUrl);
 const mentorFrames={shinigami:0,sado:1,inoue:2,quincy:3};
+const mentorActors=mentors.map(mentor=>({...mentor,name:mentor.label,classId:mentor.id,mentor:true,direction:'down',facing:1}));
+const plazaMentors=mentorActors.filter(mentor=>!mentor.hospital);
+const hospitalMentors=mentorActors.filter(mentor=>mentor.hospital);
 
 export function createRenderer(world, reducedMotion) {
   const ctx = world.getContext('2d',{alpha:false});
@@ -450,27 +453,29 @@ export function createRenderer(world, reducedMotion) {
       remotePlayers.set(player.id,actor);
     }
     const self={...hero,name:online.name??'Você',form,classId};
-    const guides=mentors.map(mentor=>({...mentor,name:mentor.label,classId:mentor.id,mentor:true,direction:'down',facing:1}));
-    const actors=[...remotePlayers.values(),self,...guides];
+    const actors=[...remotePlayers.values(),self,...plazaMentors];
     for(const actor of [...cityProps,...actors].sort((a,b)=>(a.sortY??a.y)-(b.sortY??b.y))) {
       if(actor.region) {
         const [u,v,w,h]=actor.region;
         if(propAtlas.naturalWidth) ctx.drawImage(propAtlas,u,v,w,h,actor.x,actor.y,w,h);
         continue;
       }
-      character(actor.x,actor.y,actor,actor.form,clock,0,actor.mentor);
-      ctx.font='bold 10px monospace';
-      ctx.textAlign='center';
-      const labelWidth=ctx.measureText(actor.name).width;
-      const x=Math.round(actor.x), y=Math.round(actor.y)-40;
-      if(actor===self) {
-        ctx.fillStyle='#ffe1a1';
-        ctx.fillRect(x-2,y-17,4,3);
-      }
-      ink(ctx,'#141c24e0',x-labelWidth/2-3,y-10,labelWidth+6,13);
-      ctx.fillStyle=actor.mentor ? classPaths[actor.classId].color : actor===self ? '#ffe1a1' : '#a4f0df';
-      ctx.fillText(actor.name,x,y);
+      drawNamedActor(actor,clock,actor===self);
     }
+  }
+  function drawNamedActor(actor,clock,isSelf=false) {
+    character(actor.x,actor.y,actor,actor.form,clock,0,actor.mentor);
+    ctx.font='bold 10px monospace';
+    ctx.textAlign='center';
+    const labelWidth=ctx.measureText(actor.name).width;
+    const x=Math.round(actor.x), y=Math.round(actor.y)-40;
+    if(isSelf) {
+      ctx.fillStyle='#ffe1a1';
+      ctx.fillRect(x-2,y-17,4,3);
+    }
+    ink(ctx,'#141c24e0',x-labelWidth/2-3,y-10,labelWidth+6,13);
+    ctx.fillStyle=actor.mentor ? classPaths[actor.classId].color : isSelf ? '#ffe1a1' : '#a4f0df';
+    ctx.fillText(actor.name,x,y);
   }
   function draw({zone,form,classId,hero,enemies,destination,effects,clock,fightAt,inHospital,plazaView}) {
     const camera=inHospital ? cameraFor(hospital.center,width,height)
@@ -499,7 +504,10 @@ export function createRenderer(world, reducedMotion) {
       if(bedSprite.naturalWidth) {
         for(const {x,y,width,height} of hospital.beds) ctx.drawImage(bedSprite,x,y,width,height);
       }
-      character(hero.x,hero.y,{...hero,classId},form,clock,0);
+      for(const actor of [...hospitalMentors,hero].sort((a,b)=>a.y-b.y)) {
+        if(actor===hero) character(hero.x,hero.y,{...hero,classId},form,clock,0);
+        else drawNamedActor(actor,clock);
+      }
       ctx.restore();
       return;
     }
