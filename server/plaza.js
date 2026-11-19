@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {createServer} from 'node:http';
 import {pathToFileURL} from 'node:url';
-import {plazaWalkable} from '../src/data.js';
+import {classPaths,plazaWalkable} from '../src/data.js';
 
 const lobbyLimit=80;
 const expiryMs=10_000;
@@ -68,14 +68,15 @@ export function createPlazaServer({now=Date.now}={}) {
       player.x=Math.round(body.x);
       player.y=Math.round(body.y);
       player.direction=directions.has(body.direction)?body.direction:'down';
-      player.form=Number.isInteger(body.form)&&body.form>=0&&body.form<=2?body.form:0;
+      player.classId=body.classId===null || (typeof body.classId==='string' && Object.hasOwn(classPaths,body.classId)) ? body.classId : 'shinigami';
+      player.form=player.classId==='shinigami'&&Number.isInteger(body.form)&&body.form>=0&&body.form<=2?body.form:0;
       player.moving=body.moving===true;
       player.running=player.moving&&body.running===true;
       const others=[];
       for(const other of players.values()) {
         if (other===player) continue;
-        const {id,name,x,y,direction,form,moving,running,seat}=other;
-        others.push({id,name,x,y,direction,form,moving,running,seat});
+        const {id,name,x,y,direction,form,classId,moving,running,seat}=other;
+        others.push({id,name,x,y,direction,form,classId,moving,running,seat});
       }
       send(200,{token:joining?token:undefined,self:player.name,others});
     } catch {

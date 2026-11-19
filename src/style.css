@@ -15,3 +15,51 @@
 .plaza-controls select:focus-visible{outline:2px solid var(--sun);outline-offset:2px}
 .plaza-return{white-space:nowrap}
 .patrol-nav{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap}
+
+.mentor-directory {
+  display:grid;
+  gap:10px;
+  padding:12px;
+  border-bottom:1px solid var(--edge);
+}
+.mentor-heading h3 {font-size:15px}
+.mentor-heading p,.mentor-choice-info {color:var(--muted);font-size:13px}
+.mentor-list {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,158px),1fr));gap:7px}
+.mentor-card {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:52px;
+  padding:7px 8px;
+  text-align:left;
+  background:#242a2d;
+  border:1px solid #465054;
+  border-radius:6px;
+}
+.mentor-card strong,.mentor-card small {display:block}
+.mentor-card strong small {display:inline;color:var(--mentor-color);font-size:11px}
+.mentor-icon {
+  display:grid;
+  place-items:center;
+  width:28px;
+  aspect-ratio:1;
+  flex:none;
+  color:var(--mentor-color);
+  background:#192024;
+  border:1px solid #465054;
+  border-radius:4px;
+}
+.mentor-dialog {
+  width:min(440px,calc(100% - 24px));
+  max-height:calc(100% - 24px);
+  padding:18px;
+  color:var(--ink);
+  background:#202629;
+  border:1px solid #596468;
+  border-radius:9px;
+}
+.mentor-dialog::backdrop {background:#0b0f14cc}
+.mentor-dialog h2 {font-size:19px}
+.mentor-dialogue {margin:12px 0;line-height:1.55}
+.mentor-class {padding:9px 10px;margin-bottom:9px;background:#2b3538;border-radius:5px}
+.mentor-actions {display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:13px}

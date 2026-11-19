@@ -1,16 +1,21 @@
 import { createRenderer } from './renderer.js';
 import { createPresence } from './presence.js';
-import { maps, loot, drops, forms, powers, key, initial, worldSize, cameraFor, plaza, plazaWalkable } from './data.js';
+import { maps, loot, drops, forms, powers, key, initial, worldSize, cameraFor, plaza, plazaWalkable, classPaths, mentors } from './data.js';
 
 export function createGame(world) {
   let storageOK = true;
   function load() {
     try {
       const data = JSON.parse(localStorage.getItem(key));
-      if (data?.version === 2 && maps[data.zone] && maps[data.unlocked]) return data;
+      if (!maps[data?.zone] || !maps[data?.unlocked]) return initial();
+      if (data.version === 3) {
+        const classId = Object.hasOwn(classPaths,data.classId) ? data.classId : null;
+        return {...data,classId,inPlaza:!classId || data.inPlaza};
+      }
+      if (data.version === 2) return {...data,version:3,classId:'shinigami'};
       if (data?.version === 1 && maps[data.zone] && maps[data.unlocked]) {
         const {level,xp,reishi,form,zone,unlocked,kills,cleared,savedAt} = data;
-        return {...initial(),level,xp,reishi,form,zone,unlocked,kills,cleared,savedAt,auto:!data.paused,legacyBlade:data.blade,legacyArmor:data.armor};
+        return {...initial(),classId:'shinigami',inPlaza:undefined,level,xp,reishi,form,zone,unlocked,kills,cleared,savedAt,auto:!data.paused,legacyBlade:data.blade,legacyArmor:data.armor};
       }
     } catch { storageOK = false; }
     return initial();
@@ -18,7 +23,10 @@ export function createGame(world) {
   const saveNumber = new Intl.NumberFormat('pt-BR');
   const fmt = value => saveNumber.format(value);
   let offlineMessage = '';
-  let state = load();
+  const state = load();
+  const classInfo = () => classPaths[state.classId];
+  const attackRange = () => classInfo()?.range ?? 27;
+  let walkingToMentor = null, activeMentor = null;
   const presence=createPresence();
   let hero, enemies, path = [], destination, clock = 0, previousFrame, manualUntil = 0, cooldown = 0, guard = 0,
       block = false, messages = [], effects = [], renderAt = 0, savedAt = 0, fightAt = 0, bossMode = false, hiddenSince = null;
@@ -31,7 +39,7 @@ export function createGame(world) {
   let walkable;
   const nowMap = () => maps[state.zone];
   const attack = () => 13+(state.level-1)*3+state.str*4+state.form*8+state.legacyBlade*5+(state.gear.blade ? itemStat(state.gear.blade) : 0);
-  const health = () => 80+(state.level-1)*10+state.vit*14+state.legacyArmor*24+(state.gear.armor ? itemStat(state.gear.armor) : 0);
+  const health = () => 80+(state.level-1)*10+state.vit*14+(classInfo()?.bonusHp ?? 0)+state.legacyArmor*24+(state.gear.armor ? itemStat(state.gear.armor) : 0);
   const need = () => 22+(state.level-1)*11;
   const far = (a,b) => Math.hypot(a.x-b.x,a.y-b.y);
   const xy = ([x,y]) => ({x,y});
@@ -70,7 +78,7 @@ export function createGame(world) {
   }
   function startPresence() {
     presence.start(()=>({
-      x:hero.x,y:hero.y,direction:hero.direction,form:state.form,
+      x:hero.x,y:hero.y,direction:hero.direction,form:state.form,classId:state.classId,
       moving:hero.moving,running:hero.running
     }));
   }
@@ -83,6 +91,8 @@ export function createGame(world) {
     enemies=inPlaza ? [] : nowMap().spawns.map((p,i)=>foe(p,i));
     destination=null;
     path=[];
+    walkingToMentor=null;
+    activeMentor=null;
     bossMode=false;
     block=false;
     effects=[];
@@ -187,6 +197,38 @@ export function createGame(world) {
     hero.moving=hero.x!==oldX || hero.y!==oldY;
     if(hero.moving) hero.gaitTime += Math.hypot(hero.x-oldX,hero.y-oldY)/82;
   }
+  function openMentor(mentor) {
+    activeMentor=mentor;
+    walkingToMentor=null;
+    keys.clear();
+    setDestination(null);
+    face(mentor.x-hero.x,mentor.y-hero.y);
+    hero.moving=false;
+    hero.running=false;
+    publish();
+  }
+  function visitMentor(id) {
+    const mentor=mentors.find(option=>option.id===id);
+    if(!state.inPlaza || activeMentor || !mentor) return;
+    if(far(hero,mentor)<=28) return openMentor(mentor);
+    walkingToMentor=mentor;
+    setDestination({x:mentor.x,y:mentor.approachY});
+    publish();
+  }
+  function closeMentor() {
+    if(!activeMentor) return;
+    activeMentor=null;
+    publish();
+  }
+  function chooseClass(id) {
+    if(!state.inPlaza || state.classId || activeMentor?.id!==id || far(hero,activeMentor)>28) return;
+    state.classId=id;
+    hero.hp=health();
+    log('Você escolheu a classe '+classInfo().name+' com '+activeMentor.label+'.');
+    closeMentor();
+    save();
+    publish();
+  }
   function target() {
     return enemies.reduce((best,enemy)=>{
       if(enemy.hp<=0 || (bossMode && !enemy.boss)) return best;
@@ -214,7 +256,9 @@ export function createGame(world) {
     return false;
   }
   function clearToHero(enemy) {
-    for(const part of [.25,.5,.75]) {
+    const samples=Math.ceil(far(hero,enemy)/8);
+    for(let index=1;index<samples;index++) {
+      const part=index/samples;
       if(!avoidWall(enemy.x+(hero.x-enemy.x)*part,enemy.y+(hero.y-enemy.y)*part)) return false;
     }
     return true;
@@ -272,18 +316,23 @@ export function createGame(world) {
       if (e.hp<=0 && !e.boss && clock>=e.recover) Object.assign(e,foe(nowMap().spawns[e.index],e.index));
       if (e.hp>0) moveEnemy(e,dt);
     });
-    if (clock<hero.rest) return;
+    if (clock<hero.rest || activeMentor) return;
+    if(walkingToMentor && far(hero,walkingToMentor)<=28) {
+      openMentor(walkingToMentor);
+      return;
+    }
     const x=Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'));
     const y=Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'));
     if(x||y) {
       destination=null;
       path=[];
+      walkingToMentor=null;
       manualUntil=clock+1.4;
       hero.running=true;
       move(x*100,y*100,dt*101);
     } else {
       if(!state.inPlaza && state.auto && clock>=manualUntil && !destination) setDestination(target());
-      const chasing=destination?.max && (far(hero,destination)>25 || !clearToHero(destination));
+      const chasing=destination?.max && (far(hero,destination)>attackRange()-2 || !clearToHero(destination));
       if(chasing && clock>=repathAt &&
           (!path.length || far(destination,plannedTarget)>=8)) setDestination(destination);
       if(path.length && (!destination?.max || chasing)) {
@@ -293,7 +342,7 @@ export function createGame(world) {
       } else if(destination && !destination.max && !path.length) destination=null;
     }
     const enemy=destination?.max && destination.hp>0 ? destination : null;
-    if(enemy && far(hero,enemy)<=27 && clock-fightAt>=.59 && clearToHero(enemy)) strike(enemy,attack());
+    if(enemy && far(hero,enemy)<=attackRange() && clock-fightAt>=.59 && clearToHero(enemy)) strike(enemy,attack());
     for (const e of enemies) {
       if(e.hp<=0 || (bossMode && !e.boss)) continue;
       attackHero(e);
@@ -376,11 +425,11 @@ export function createGame(world) {
     return Boolean(boss && boss.charge > clock && far(hero,boss) <= 36);
   }
   function canUseSkill() {
-    return clock >= cooldown && destination?.max && destination.hp > 0
-      && far(hero,destination) <= 42 && clock >= hero.rest;
+    return !state.inPlaza && clock >= cooldown && destination?.max && destination.hp > 0
+      && far(hero,destination) <= Math.max(42,attackRange()) && clearToHero(destination) && clock >= hero.rest;
   }
   function canRelease() {
-    return state.form < 2 && state.level >= (state.form === 0 ? 4 : 9) && state.cleared[state.form];
+    return state.classId === 'shinigami' && state.form < 2 && state.level >= (state.form === 0 ? 4 : 9) && state.cleared[state.form];
   }
   function publish() {
     const map = nowMap();
@@ -393,9 +442,10 @@ export function createGame(world) {
       auto:state.auto, bossMode, bossReady:unlockedBoss(), trail:Math.min(state.kills[state.zone],map.goal),
       hp:Math.ceil(hero.hp), maxHp:health(), xp:state.xp, goalXp:need(), reishi:state.reishi,
       level:state.level, attack:attack(), str:state.str, vit:state.vit, points:state.points,
-      form:forms[state.form], nextForm:['Shikai','Bankai','Liberado'][state.form],
+      classId:state.classId, classInfo:classInfo(), activeMentor, walkingToMentor:walkingToMentor?.id,
+      form:state.classId==='shinigami' ? forms[state.form] : null, nextForm:['Shikai','Bankai','Liberado'][state.form],
       formHint:['Nível 4 e chefe de Karakura','Nível 9 e chefe do Distrito do Vapor','Liberação máxima'][state.form],
-      releaseReady:canRelease(), skill:powers[state.form]+(remaining?' · '+remaining+'s':''),
+      releaseReady:canRelease(), skill:(state.form ? powers[state.form] : classInfo()?.skill ?? powers[0])+(remaining?' · '+remaining+'s':''),
       skillReady:Boolean(canUseSkill()), guardReady:danger && !block && clock>=guard,
       warning:danger?(block?'Defesa preparada':'Golpe espiritual! Defenda ou saia da área.'):'',
       equipped:{...state.gear}, inventory:state.bag.map(id=>({id,...loot[id],value:itemStat(id),cost:equipCost(id),upgrade:state.upgrades[id]??0})),
@@ -404,7 +454,7 @@ export function createGame(world) {
     listeners.forEach(notify=>notify());
   }
   function openDistrict(index) {
-    if (!maps[index] || (!state.inPlaza && index === state.zone) || index > state.unlocked) return;
+    if (!state.classId || !maps[index] || (!state.inPlaza && index === state.zone) || index > state.unlocked) return;
     enter(index);
     log('Patrulha em '+nowMap().name+'.');
     save();
@@ -453,7 +503,13 @@ export function createGame(world) {
   function useSkill() {
     if (!canUseSkill()) return;
     cooldown=clock+5.8;
-    strike(destination,Math.round(attack()*(2.2+state.form*.55)),true);
+    const {power,recovery}=classInfo();
+    strike(destination,Math.round(attack()*(power+state.form*.55)),true);
+    if(recovery) {
+      const restored=Math.min(Math.ceil(health()*recovery),Math.floor(health()-hero.hp));
+      hero.hp+=restored;
+      if(restored) effects.push({x:hero.x,y:hero.y-26,text:'+'+restored+' PV',color:'#a5edbc',until:clock+.85});
+    }
     publish();
   }
   function release() {
@@ -471,6 +527,12 @@ export function createGame(world) {
       x:camera.x+(event.clientX-bounds.left)*world.width/bounds.width,
       y:camera.y+(event.clientY-bounds.top)*world.height/bounds.height
     };
+    if(state.inPlaza) {
+      if(activeMentor) return;
+      const mentor=mentors.find(({x,y})=>Math.abs(x-point.x)<=37 && point.y>=y-50 && point.y<=y+12);
+      if(mentor) return visitMentor(mentor.id);
+      walkingToMentor=null;
+    }
     const enemy=enemies.filter(e=>e.hp>0).reduce((best,e)=>{
       const headY=e.y-(e.boss?46:e.demi?34:27);
       const bodyY=e.y-(e.boss?17:9);
@@ -483,6 +545,7 @@ export function createGame(world) {
   }
   function keydown(event) {
     const key=event.key.toLowerCase();
+    if (activeMentor || event.target.closest?.('dialog, input, select, textarea')) return;
     if (!movement.has(key) || event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
     if (key.startsWith('arrow') && event.target.closest?.('[role="tablist"]')) return;
     keys.add(key);
@@ -514,7 +577,7 @@ export function createGame(world) {
   function frame(time) {
     if(!document.hidden) {
       simulate(Math.min(.055,Math.max(0,(time-(previousFrame??time))/1000)));
-      draw({zone:state.zone,form:state.form,hero,enemies,destination,effects,clock,fightAt,
+      draw({zone:state.zone,form:state.form,classId:state.classId,hero,enemies,destination,effects,clock,fightAt,
         plazaView:state.inPlaza ? presence : null});
       if(Date.now()-savedAt>=3500) save();
       if(time>=renderAt) {
@@ -544,7 +607,7 @@ export function createGame(world) {
       listeners.add(notify);
       return ()=>listeners.delete(notify);
     },
-    addPoint,setGear,reinforce,openDistrict,openPlaza,toggleHunt,trackBoss,defend,useSkill,release,
+    visitMentor,closeMentor,chooseClass,addPoint,setGear,reinforce,openDistrict,openPlaza,toggleHunt,trackBoss,defend,useSkill,release,
     dispose() {
       cancelAnimationFrame(animationId);
       world.removeEventListener('pointerdown',pointAt);
