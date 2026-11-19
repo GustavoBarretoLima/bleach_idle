@@ -1,4 +1,4 @@
-import { maps } from './data.js';
+import { maps, worldSize, cameraFor } from './data.js';
 import { drawHeroPose } from './sprites.js';
 
 export function createRenderer(world, reducedMotion) {
@@ -6,8 +6,8 @@ export function createRenderer(world, reducedMotion) {
   ctx.imageSmoothingEnabled = false;
   const { width, height } = world;
   const background = document.createElement('canvas');
-  background.width = width;
-  background.height = height;
+  background.width = worldSize.width;
+  background.height = worldSize.height;
   const bg = background.getContext('2d');
   function ink(c,color,x,y,w,h) { c.fillStyle=color;c.fillRect(Math.floor(x),Math.floor(y),w,h); }
   function shape(c,color,points) {
@@ -58,46 +58,86 @@ export function createRenderer(world, reducedMotion) {
       ink(bg,'#807b75',x+w-25,y+9,9,5);
     }
   }
-  function paintTerrain(zone) {
-    const m=maps[zone], purple=zone===2;
-    ink(bg,m.ground,0,0,width,height);
-    for(let i=0;i<820;i++) {
-      const x=dice(i*6)*width,y=dice(i*6+1)*height;
+  function paintArena(map) {
+    // Reuse the tile pattern drawn by the Godot Invasão scene (survivor.gd).
+    const tile=80;
+    for(let y=0;y<worldSize.height;y+=tile) {
+      for(let x=0;x<worldSize.width;x+=tile) {
+        const alternate=((x+y)/tile)%2;
+        ink(bg,alternate?map.road:map.ground,x,y,tile-1,tile-1);
+        if(x%400===0) ink(bg,'#3c5359',x+39,y+10,2,50);
+      }
+    }
+    for(const [x,y,w,h] of map.walls) {
+      ink(bg,'#11192080',x+5,y+6,w,h);
+      ink(bg,'#283342',x,y,w,h);
+      ink(bg,map.roof,x+2,y+2,w-4,h-13);
+      ink(bg,'#647389',x+3,y+4,w-6,2);
+      for(let seam=14;seam<w-8;seam+=22) ink(bg,'#303a4f',x+seam,y+7,1,h-20);
+      ink(bg,'#263040',x+6,y+h-9,w-12,2);
+    }
+  }
+  function paintCity(map, zone) {
+    const {width:mapWidth,height:mapHeight}=worldSize;
+    ink(bg,map.ground,0,0,mapWidth,mapHeight);
+    for(let i=0;i<3200;i++) {
+      const x=dice(i*6)*mapWidth,y=dice(i*6+1)*mapHeight;
       ink(bg,i%3===0?'#e0d8a526':'#181f2528',x,y,2+i%4,1+i%2);
     }
-    ink(bg,'#202c29',0,110,width,96);
-    ink(bg,'#969188',0,113,width,89);
-    ink(bg,m.road,0,124,width,67);
-    const roadX=zone===1?347:310;
-    ink(bg,'#949489',roadX-32,0,60,height);
-    ink(bg,m.road,roadX-22,0,41,height);
-    for(let x=0;x<width;x+=24) {
-      ink(bg,'#d1c6a067',x,156,11,2);
-      ink(bg,'#454b48',x,117,1,7);
-      ink(bg,'#454b48',x,191,1,8);
-      if(x%3===0) ink(bg,'#282f34a0',x+3,129+x%53,5,1);
+
+    const roadY=[156,450];
+    for(const y of roadY) {
+      ink(bg,'#202c29',0,y-46,mapWidth,96);
+      ink(bg,'#969188',0,y-43,mapWidth,89);
+      ink(bg,map.road,0,y-32,mapWidth,67);
     }
-    for(let y=0;y<height;y+=22) ink(bg,'#d1c6a067',roadX-3,y,2,8);
-    for(let x=roadX-21;x<roadX+19;x+=6) {
-      ink(bg,'#d6cfac78',x,127,3,9);
-      ink(bg,'#d6cfac78',x,177,3,9);
+    for(const x of map.roadX) {
+      ink(bg,'#949489',x-32,0,60,mapHeight);
+      ink(bg,map.road,x-22,0,41,mapHeight);
+      for(let y=10;y<mapHeight;y+=22) ink(bg,'#d1c6a067',x-3,y,2,8);
     }
-    const trees=[[19,99],[147,93],[213,95],[342,96],[513,104],[24,211],[162,221],[288,215],[378,215],[521,213]];
-    for(const [x,y] of trees) tree(x,y,purple?'#74617b':'#4f6850');
-    m.walls.forEach(([x,y,w,h],index)=>building(x,y,w,h,index,m));
-    for(const [x,y] of [[50,115],[225,113],[360,114],[500,113],[72,195],[259,196],[401,197]]) {
-      ellipse(bg,'#f2ab4937',x,y+2,10,7);
-      ink(bg,'#292d32',x,y-11,2,12);
-      ink(bg,'#ffcf86',x-3,y-12,8,3);
+    for(const y of roadY) {
+      for(let x=5;x<mapWidth;x+=24) {
+        if(map.roadX.some(road=>Math.abs(road-x)<36)) continue;
+        ink(bg,'#d1c6a067',x,y,11,2);
+        ink(bg,'#454b48',x,y-39,1,7);
+        ink(bg,'#454b48',x,y+35,1,8);
+      }
+      for(const road of map.roadX) {
+        for(let x=road-21;x<road+19;x+=6) {
+          ink(bg,'#d6cfac78',x,y-29,3,9);
+          ink(bg,'#d6cfac78',x,y+21,3,9);
+        }
+      }
     }
-    const [ax,ay]=m.altar;
+
+    const trees=[[19,99],[147,93],[213,95],[342,96],[513,104],[24,211],[162,221],[288,215],[378,215],[521,213],
+      [540,106],[767,108],[1069,110],[556,363],[1074,375],[20,389],[239,498],[698,390],[864,500],[1080,504],[329,545]];
+    for(const [x,y] of trees) tree(x,y,zone===1?'#586e58':'#4f6850');
+    map.walls.forEach(([x,y,w,h],index)=>building(x,y,w,h,index,map));
+    for(const x of [50,225,360,500,590,720,888,1060]) {
+      for(const y of [115,195,408,491]) {
+        if(map.roadX.some(road=>Math.abs(road-x)<28)) continue;
+        ellipse(bg,'#f2ab4937',x,y+2,10,7);
+        ink(bg,'#292d32',x,y-11,2,12);
+        ink(bg,'#ffcf86',x-3,y-12,8,3);
+      }
+    }
+  }
+  function paintTerrain(zone) {
+    const map=maps[zone];
+    ink(bg,map.ground,0,0,worldSize.width,worldSize.height);
+    if(map.arena) paintArena(map);
+    else paintCity(map,zone);
+
+    const [ax,ay]=map.altar;
     ellipse(bg,'#352c3c93',ax,ay,19,11);
     ellipse(bg,'#d6a4f28c',ax,ay,15,8);
-    ellipse(bg,m.road,ax,ay,12,6);
+    ellipse(bg,map.road,ax,ay,12,6);
     ink(bg,'#edc6ff',ax-1,ay-2,3,5);
     bg.strokeStyle='#12191c';
     bg.lineWidth=4;
-    bg.strokeRect(0,0,width,height);
+    bg.strokeRect(0,0,worldSize.width,worldSize.height);
   }
   function character(x,y,actor,form,clock,fightAt) {
     const step=actor.moving&&!reducedMotion.matches ? Math.floor(clock*12)%2 : 0;
@@ -221,24 +261,29 @@ export function createRenderer(world, reducedMotion) {
     ctx.restore();
   }
   function draw({zone,form,hero,enemies,destination,effects,clock,fightAt}) {
-    ctx.drawImage(background,0,0);
+    const camera=cameraFor(hero,width,height);
+    ctx.drawImage(background,camera.x,camera.y,width,height,0,0,width,height);
+    ctx.save();
+    ctx.translate(-camera.x,-camera.y);
     if(destination && !destination.max) {
       ellipse(ctx,'#d9e5ce75',destination.x,destination.y,7,4);
       ellipse(ctx,'#233629',destination.x,destination.y,4,2);
     }
-    const living=enemies.filter(e=>e.hp>0);
+    const living=enemies.filter(e=>e.hp>0 && e.x>=camera.x-42 && e.x<=camera.x+width+42 &&
+      e.y>=camera.y-45 && e.y<=camera.y+height+75);
     for(const actor of [...living,hero].sort((a,b)=>a.y-b.y)) {
       if(actor===hero) character(hero.x,hero.y,hero,form,clock,fightAt);
       else monster(actor,zone,clock,hero);
     }
     const targetEnemy=destination?.max && destination.hp>0 ? destination : null;
-    if(targetEnemy) {
+    if(targetEnemy && living.includes(targetEnemy)) {
       const label=targetEnemy.boss ? maps[zone].boss : targetEnemy.demi ? 'Demi-Hollow' : maps[zone].foe;
       ctx.font='bold 11px monospace';
       ctx.textAlign='center';
       const labelWidth=ctx.measureText(label).width;
-      const x=Math.max(labelWidth/2+4,Math.min(width-labelWidth/2-4,targetEnemy.x));
-      const y=targetEnemy.y-(targetEnemy.boss?67:50);
+      const margin=labelWidth/2+4;
+      const x=Math.max(camera.x+margin,Math.min(camera.x+width-margin,targetEnemy.x));
+      const y=Math.max(camera.y+12,targetEnemy.y-(targetEnemy.boss?67:50));
       ink(ctx,'#1e1e25dc',x-labelWidth/2-3,y-10,labelWidth+6,13);
       ctx.fillStyle='#f6e6d2';ctx.fillText(label,x,y);
     }
@@ -250,6 +295,7 @@ export function createRenderer(world, reducedMotion) {
       ctx.strokeText(f.text,f.x,f.y-dy);
       ctx.fillStyle=f.color;ctx.fillText(f.text,f.x,f.y-dy);
     }
+    ctx.restore();
   }
 
   return { paintTerrain, draw };
