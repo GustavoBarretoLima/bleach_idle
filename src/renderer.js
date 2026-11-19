@@ -4,6 +4,8 @@ import { city, cityCamera, cityProps, decodeCityPosition } from './city.js';
 import groundUrl from './karakura/ground.webp';
 import propsUrl from './karakura/props.webp';
 import mentorsUrl from './karakura/mentors.png';
+import bedUrl from './karakura/hospital-bed.png';
+import { hospital } from './hospital.js';
 
 const loadTexture = url => {
   const image = new Image();
@@ -13,6 +15,7 @@ const loadTexture = url => {
 const cityGround=loadTexture(groundUrl);
 const propAtlas=loadTexture(propsUrl);
 const mentorAtlas=loadTexture(mentorsUrl);
+const bedSprite=loadTexture(bedUrl);
 const mentorFrames={shinigami:0,sado:1,inoue:2,quincy:3};
 
 export function createRenderer(world, reducedMotion) {
@@ -138,7 +141,78 @@ export function createRenderer(world, reducedMotion) {
       }
     }
   }
-  function paintTerrain(zone, inPlaza) {
+  function hospitalLabel(c,label,x,y,color='#dcefea') {
+    c.font='bold 10px monospace';
+    c.textAlign='center';
+    const width=c.measureText(label).width;
+    ink(c,'#162a32',x-width/2-5,y-10,width+10,14);
+    c.fillStyle=color;
+    c.fillText(label,x,y);
+  }
+  function paintHospital() {
+    const {bounds,desk,benches,partition,beds,exit}=hospital;
+    const {left,top,right,bottom}=bounds;
+    const width=right-left, height=bottom-top;
+    ink(bg,'#151f28',0,0,worldSize.width,worldSize.height);
+    ink(bg,'#20353a',left-4,top-4,width+8,height+8);
+    ink(bg,'#8ca9a5',left,top,width,height);
+    ink(bg,'#cbd8ce',left+8,top+7,width-16,28);
+    ink(bg,'#579991',left+8,top+31,width-16,4);
+    for(let y=top+36;y<bottom-7;y+=16) {
+      for(let x=left+8;x<right-8;x+=16) {
+        const alternate=((x-left-8)/16+(y-top-36)/16)%2;
+        ink(bg,alternate?'#aebeba':'#b9c9c2',x,y,15,Math.min(15,bottom-7-y));
+      }
+    }
+    for(const x of [470,665,725]) {
+      ink(bg,'#516d75',x,top+10,35,18);
+      ink(bg,'#85b8ce',x+2,top+12,31,13);
+      ink(bg,'#abd4e1',x+3,top+14,14,4);
+      ink(bg,'#506c76',x+16,top+12,2,13);
+    }
+    ink(bg,'#378e82',left+20,top+11,21,17);
+    ink(bg,'#dcefea',left+29,top+13,4,13);
+    ink(bg,'#dcefea',left+24,top+18,14,4);
+
+    ink(bg,'#799698',desk.x+3,desk.y+5,desk.width,desk.height);
+    ink(bg,'#3c7373',desk.x,desk.y,desk.width,desk.height);
+    ink(bg,'#70a79e',desk.x+3,desk.y+2,desk.width-6,13);
+    ink(bg,'#d5dfd2',desk.x+83,desk.y+5,20,6);
+    ink(bg,'#293a48',desk.x+11,desk.y-5,22,12);
+    ink(bg,'#91b2c5',desk.x+13,desk.y-3,18,7);
+    hospitalLabel(bg,'RECEPÇÃO',desk.x+62,desk.y-12);
+    for(const {x,y,width,height} of benches) {
+      ink(bg,'#819899',x+2,y+3,width,height);
+      ink(bg,'#3b767c',x,y,width,height);
+      for(let slot=0;slot<3;slot++) {
+        ink(bg,'#68a69e',x+3+slot*27,y+3,24,10);
+        ink(bg,'#537279',x+6+slot*27,y+15,4,3);
+      }
+    }
+    for(const {x,y,width,height} of partition) {
+      ink(bg,'#667d83',x+3,y+2,width,height);
+      ink(bg,'#ecede0',x,y,width,height);
+      ink(bg,'#83a29e',x+2,y+3,2,height-6);
+    }
+    hospitalLabel(bg,'ENFERMARIA',666,top+47);
+    for(const {x,y,width,height} of beds) {
+      ink(bg,'#819594',x+1,y+6,width+2,height-1);
+      ink(bg,'#f3f0dc',x,y,width,height);
+      ink(bg,'#496f88',x+21,y+2,width-23,height-4);
+      ink(bg,'#85aac0',x+21,y+4,width-25,4);
+      ink(bg,'#4c6c78',x-17,y+5,11,16);
+      ink(bg,'#e2e9dc',x-17,y+5,11,5);
+    }
+    ink(bg,'#34525c',exit.x-26,bottom-12,52,14);
+    ink(bg,'#78aaa1',exit.x-24,bottom-10,48,2);
+    ink(bg,'#b3d4c7',exit.x-16,exit.y-3,32,2);
+    hospitalLabel(bg,'SAÍDA',exit.x,exit.y-14);
+  }
+  function paintTerrain(zone, inPlaza, inHospital) {
+    if(inHospital) {
+      paintHospital();
+      return;
+    }
     if(inPlaza) return;
     const map=maps[zone];
     ink(bg,map.ground,0,0,worldSize.width,worldSize.height);
@@ -398,8 +472,9 @@ export function createRenderer(world, reducedMotion) {
       ctx.fillText(actor.name,x,y);
     }
   }
-  function draw({zone,form,classId,hero,enemies,destination,effects,clock,fightAt,plazaView}) {
-    const camera=(plazaView ? cityCamera : cameraFor)(hero,width,height);
+  function draw({zone,form,classId,hero,enemies,destination,effects,clock,fightAt,inHospital,plazaView}) {
+    const camera=inHospital ? cameraFor(hospital.center,width,height)
+      : (plazaView ? cityCamera : cameraFor)(hero,width,height);
     if(!plazaView) ctx.drawImage(background,camera.x,camera.y,width,height,0,0,width,height);
     else ink(ctx,'#30383b',0,0,width,height);
     ctx.save();
@@ -413,12 +488,21 @@ export function createRenderer(world, reducedMotion) {
     }
     if(plazaView) {
       drawPlaza(hero,form,classId,plazaView,clock);
+      hospitalLabel(ctx,'HOSPITAL',hospital.entrance.x,hospital.entrance.y-32,'#adf4d7');
       lastDraw=clock;
       ctx.restore();
       return;
     }
     lastDraw=clock;
     remotePlayers.clear();
+    if(inHospital) {
+      if(bedSprite.naturalWidth) {
+        for(const {x,y,width,height} of hospital.beds) ctx.drawImage(bedSprite,x,y,width,height);
+      }
+      character(hero.x,hero.y,{...hero,classId},form,clock,0);
+      ctx.restore();
+      return;
+    }
     const living=enemies.filter(e=>e.hp>0 && e.x>=camera.x-42 && e.x<=camera.x+width+42 &&
       e.y>=camera.y-45 && e.y<=camera.y+height+75);
     for(const actor of [...living,hero].sort((a,b)=>a.y-b.y)) {
