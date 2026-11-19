@@ -57,8 +57,9 @@ export function createGame(world) {
     if (!quiet) log('Item coletado: '+loot[id].name+'.');
   }
   function foe(point,index,boss=false) {
+    const demi = !boss && state.zone === 0 && index % 2 === 0;
     const max = boss ? nowMap().bossHp : nowMap().hp;
-    return {...xy(point),index,boss,hp:max,max,recover:0,charge:0,swing:0,hitAt:0};
+    return {...xy(point),index,boss,demi,hp:max,max,recover:0,charge:0,swing:0,hitAt:0};
   }
   function enter(zone) {
     state.zone=zone;
@@ -363,8 +364,11 @@ export function createGame(world) {
     const bounds=world.getBoundingClientRect();
     const point={x:(event.clientX-bounds.left)*width/bounds.width,y:(event.clientY-bounds.top)*height/bounds.height};
     const enemy=enemies.filter(e=>e.hp>0).reduce((best,e)=>{
-      const range=far(point,{x:e.x,y:e.y-(e.boss?17:9)});
-      return range<19 && (!best || range<best.range) ? {e,range} : best;
+      const headY=e.y-(e.boss?46:e.demi?34:27);
+      const bodyY=e.y-(e.boss?17:9);
+      const nearestY=Math.max(headY,Math.min(bodyY,point.y));
+      const range=far(point,{x:e.x,y:nearestY});
+      return range<(e.boss?24:19) && (!best || range<best.range) ? {e,range} : best;
     },null);
     manualUntil=clock+3;
     setDestination(enemy?.e??point);
