@@ -19,17 +19,25 @@ function Meter({ value, max, unit, xp }) {
 
 function PatrolControls({ view, game }) {
   return <div className="hud">
-    <div className="hudTop">
-      <div className="bars">
-        <Meter value={view.hp} max={view.maxHp} unit="PV" />
-        <Meter value={view.xp} max={view.goalXp} unit="XP" xp />
-      </div>
-      <button className={view.auto ? 'button on' : 'button'} aria-pressed={view.auto} onClick={game.toggleHunt}>
-        {view.auto ? 'Caça ativa' : 'Iniciar caça'}
+    <div className="bars">
+      <Meter value={view.hp} max={view.maxHp} unit="PV" />
+      <Meter value={view.xp} max={view.goalXp} unit="XP" xp />
+    </div>
+    <div className="combat-keys" role="group" aria-label="Ataques">
+      <button className="button on" aria-keyshortcuts="J" disabled={!view.attackReady} onClick={()=>game.useAttack('j')}>
+        <kbd>J</kbd> Ataque básico
+      </button>
+      <button className="button boss" aria-keyshortcuts="K" disabled={!view.attackReady} onClick={()=>game.useAttack('k')}>
+        <kbd>K</kbd> Ataque forte
       </button>
     </div>
+    <div className="skill-keys" role="group" aria-label="Habilidades">
+      {view.skills.map(({name,remaining,ready},index)=><button key={index} className="button skill"
+        aria-keyshortcuts={String(index+1)} disabled={!ready} onClick={()=>game.useSkill(index)}>
+        <kbd>{index+1}</kbd> <span>{name ?? 'Não aprendida'}{remaining>0 && <small>{remaining}s</small>}</span>
+      </button>)}
+    </div>
     <div className="actions">
-      <button className="button skill" disabled={!view.skillReady} onClick={game.useSkill}>{view.skill}</button>
       <button className="button" disabled={!view.guardReady} onClick={game.defend}>Defender</button>
       <button className="button boss" disabled={!view.bossMode && !view.bossReady} onClick={game.trackBoss}>
         {view.bossMode ? 'Encerrar rastreio' : view.cleared[view.zone] ? 'Chefe purificado' : 'Rastrear chefe'}
@@ -226,7 +234,6 @@ function App() {
       <div><h1>Bleach Idle</h1><p>Vigília de Karakura</p></div></div>
       <div className="money"><small>REISHI</small><b>{fmt.format(view?.reishi ?? 0)}</b></div>
     </header>
-    {view?.offlineMessage && <p className="summary" role="status">{view.offlineMessage}</p>}
     <div className="grid"><div className="column">
       <section className="panel" aria-labelledby="place">
         <div className="maphead"><div><h2 id="place">{view?.inHospital ? 'Hospital de Karakura' : view?.inPlaza || !view ? 'Karakura' : view.map.name}</h2>
@@ -235,13 +242,13 @@ function App() {
             {view.inHospital ? 'Sair do hospital' : 'Entrar no hospital'}
           </button>}
           {view && !view.inPlaza && <div className="patrol-nav">
-            <span className="tag">{view.bossMode ? 'Encontro com chefe' : view.auto ? 'Caça automática' : 'Exploração livre'}</span>
+            <span className="tag">{view.bossMode ? 'Encontro com chefe' : 'Combate manual'}</span>
             <button className="button plaza-return" onClick={game.openPlaza}>Voltar à praça</button>
           </div>}
         </div>
         <div className="viewport">
           <canvas ref={world} width="544" height="306" tabIndex={0} aria-label={view?.inHospital ? "Hospital de Karakura. Use WASD para andar, toque na saída ou selecione um mentor na lista."
-            : view?.inPlaza ? "Praça Principal. Use WASD para andar, toque na porta do hospital ou selecione um mentor na lista." : "Mapa de patrulha. Toque ou use WASD para andar."} />
+            : view?.inPlaza ? "Praça Principal. Use WASD para andar, toque na porta do hospital ou selecione um mentor na lista." : "Mapa de patrulha. Toque ou use WASD para andar. Use J, K e 1 a 5 para atacar."} />
           <span className="risk" role="status" hidden={!view?.warning}>{view?.warning}</span>
           <span className="worldnote">{view?.inPlaza ? 'WASD ou toque · E na porta' : 'WASD ou toque para andar'}</span>
         </div>
@@ -252,7 +259,7 @@ function App() {
         <ul>{view.messages.map((message,index) => <li key={message + index}>{message}</li>)}</ul>
       </section>}
     </div>{view && <CharacterPanel view={view} game={game} />}</div>
-    {view && <footer>Protótipo de fã · {view.storageOK ? 'Progresso salvo neste navegador · Caça offline de até 8 horas' : 'Salvamento indisponível neste navegador'}</footer>}
+    {view && <footer>Protótipo de fã · {view.storageOK ? 'Progresso salvo neste navegador' : 'Salvamento indisponível neste navegador'}</footer>}
   </main>;
 }
 

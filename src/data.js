@@ -65,4 +65,4 @@ export const drops = [['steel','coat'],['moon','silk'],['dusk','veil']];
 export const forms = ['Selada','Shikai','Bankai'];
 export const powers = ['Corte espiritual','Lua Partida','Eclipse da Vigília'];
 export const key = 'bleach-idle-vigilia-v1';
-export const initial = () => ({version:3, classId:null, inPlaza:true, level:1,xp:0,reishi:18,str:0,vit:0,points:0,legacyBlade:0,legacyArmor:0,form:0,zone:0,unlocked:0,kills:[0,0,0],cleared:[false,false,false],auto:true,bag:[],gear:{blade:null,armor:null},upgrades:{},savedAt:Date.now()});
+export const initial = () => ({version:3, classId:null, inPlaza:true, level:1,xp:0,reishi:18,str:0,vit:0,points:0,legacyBlade:0,legacyArmor:0,form:0,zone:0,unlocked:0,kills:[0,0,0],cleared:[false,false,false],bag:[],gear:{blade:null,armor:null},upgrades:{},savedAt:Date.now()});

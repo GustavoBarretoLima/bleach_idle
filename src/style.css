@@ -68,3 +68,14 @@
 @media(max-width:400px){.hospital-door{font-size:12px;padding-inline:7px}}
 
 .mentor-vitals {color:var(--teal);font-weight:700;margin:0 0 10px}
+
+.combat-keys,.skill-keys {display:grid;gap:6px;margin-top:7px}
+.combat-keys {grid-template-columns:repeat(2,minmax(0,1fr))}
+.skill-keys {grid-template-columns:repeat(auto-fit,minmax(min(100%,99px),1fr))}
+.combat-keys .button,.skill-keys .button {display:flex;align-items:center;gap:6px;text-align:left}
+.skill-keys small {display:block}
+.combat-keys kbd,.skill-keys kbd {
+  display:inline-grid;place-items:center;flex:none;min-width:18px;height:20px;padding:0 3px;
+  border:1px solid currentColor;border-radius:4px;font:700 11px monospace
+}
+@media(max-width:660px){.combat-keys .button,.skill-keys .button{font-size:12px}}
