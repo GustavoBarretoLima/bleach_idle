@@ -477,7 +477,7 @@ export function createRenderer(world, reducedMotion) {
     ctx.fillStyle=actor.mentor ? classPaths[actor.classId].color : isSelf ? '#ffe1a1' : '#a4f0df';
     ctx.fillText(actor.name,x,y);
   }
-  function draw({zone,form,classId,hero,enemies,destination,effects,clock,fightAt,inHospital,plazaView}) {
+  function draw({zone,form,classId,hero,enemies,destination,selectedEnemy,effects,clock,fightAt,inHospital,plazaView}) {
     const camera=inHospital ? cameraFor(hospital.center,width,height)
       : (plazaView ? cityCamera : cameraFor)(hero,width,height);
     if(!plazaView) ctx.drawImage(background,camera.x,camera.y,width,height,0,0,width,height);
@@ -517,7 +517,7 @@ export function createRenderer(world, reducedMotion) {
       if(actor===hero) character(hero.x,hero.y,{...hero,classId},form,clock,fightAt);
       else monster(actor,zone,clock,hero);
     }
-    const targetEnemy=destination?.max && destination.hp>0 ? destination : null;
+    const targetEnemy=selectedEnemy?.hp>0 ? selectedEnemy : null;
     if(targetEnemy && living.includes(targetEnemy)) {
       const label=targetEnemy.boss ? maps[zone].boss : targetEnemy.demi ? 'Demi-Hollow' : maps[zone].foe;
       ctx.font='bold 11px monospace';
