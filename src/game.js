@@ -1,5 +1,5 @@
 import { createRenderer } from './renderer.js';
-import { maps, loot, drops, forms, powers, key, initial } from './data.js';
+import { maps, loot, drops, forms, powers, key, initial, worldSize, cameraFor } from './data.js';
 
 export function createGame(world) {
   let storageOK = true;
@@ -24,7 +24,9 @@ export function createGame(world) {
   let plannedTarget, repathAt = 0;
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const {paintTerrain, draw} = createRenderer(world, reducedMotion);
-  const width = world.width, height = world.height, nx = 34, ny = 19, cell = 16;
+  const cell = 16;
+  const nx = Math.ceil(worldSize.width/cell), ny = Math.ceil(worldSize.height/cell);
+  let walkable;
   const nowMap = () => maps[state.zone];
   const attack = () => 13+(state.level-1)*3+state.str*4+state.form*8+state.legacyBlade*5+(state.gear.blade ? itemStat(state.gear.blade) : 0);
   const health = () => 80+(state.level-1)*10+state.vit*14+state.legacyArmor*24+(state.gear.armor ? itemStat(state.gear.armor) : 0);
@@ -74,6 +76,11 @@ export function createGame(world) {
     block=false;
     effects=[];
     manualUntil=0;
+    walkable=new Uint8Array(nx*ny);
+    for(let i=0;i<walkable.length;i++) {
+      const {x,y}=cellPoint(i);
+      walkable[i]=Number(avoidWall(x,y));
+    }
     paintTerrain(state.zone);
   }
   function finish(enemy) {
@@ -109,14 +116,14 @@ export function createGame(world) {
     if (enemy.hp<=0) finish(enemy);
   }
   function avoidWall(x,y) {
-    return x>=9 && x<=width-9 && y>=12 && y<=height-9 && !nowMap().walls.some(([l,t,w,h])=>x>l-6 && x<l+w+6 && y>t-4 && y<t+h+6);
+    return x>=9 && x<=worldSize.width-9 && y>=12 && y<=worldSize.height-9 && !nowMap().walls.some(([l,t,w,h])=>x>l-6 && x<l+w+6 && y>t-4 && y<t+h+6);
   }
   function cellPoint(index) { return {x:index%nx*cell+8,y:Math.floor(index/nx)*cell+8}; }
   function closestCell(point) {
     let best=-1, distance=Infinity;
     for (let i=0;i<nx*ny;i++) {
+      if (!walkable[i]) continue;
       const center=cellPoint(i);
-      if (!avoidWall(center.x,center.y)) continue;
       const d=far(point,center);
       if (d<distance) { best=i;distance=d; }
     }
@@ -131,8 +138,7 @@ export function createGame(world) {
       const current=queue[i], x=current%nx;
       for(const next of [x>0?current-1:-1,x<nx-1?current+1:-1,current-nx,current+nx]) {
         if(next<0 || next>=parents.length || parents[next]!==-1) continue;
-        const coords=cellPoint(next);
-        if (!avoidWall(coords.x,coords.y)) continue;
+        if (!walkable[next]) continue;
         parents[next]=current;
         queue.push(next);
       }
@@ -436,7 +442,12 @@ export function createGame(world) {
   }
   function pointAt(event) {
     const bounds=world.getBoundingClientRect();
-    const point={x:(event.clientX-bounds.left)*width/bounds.width,y:(event.clientY-bounds.top)*height/bounds.height};
+    if(!bounds.width || !bounds.height) return;
+    const camera=cameraFor(hero,world.width,world.height);
+    const point={
+      x:camera.x+(event.clientX-bounds.left)*world.width/bounds.width,
+      y:camera.y+(event.clientY-bounds.top)*world.height/bounds.height
+    };
     const enemy=enemies.filter(e=>e.hp>0).reduce((best,e)=>{
       const headY=e.y-(e.boss?46:e.demi?34:27);
       const bodyY=e.y-(e.boss?17:9);
