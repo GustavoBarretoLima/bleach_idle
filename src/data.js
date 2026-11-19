@@ -1,4 +1,17 @@
 export const worldSize = {width:1120,height:640};
+export const plaza = {
+  center:{x:560,y:320},
+  bounds:{left:316,top:201,right:804,bottom:443},
+  fountain:{left:526,top:285,right:594,bottom:339},
+  spawnY:388
+};
+
+export function plazaWalkable(x,y) {
+  const {bounds,fountain}=plaza;
+  return x>=bounds.left && x<=bounds.right && y>=bounds.top && y<=bounds.bottom &&
+    !(x>fountain.left-4 && x<fountain.right+4 && y>fountain.top-4 && y<fountain.bottom+4);
+}
+
 export function cameraFor(hero, width, height) {
   return {
     x:Math.round(Math.max(0,Math.min(worldSize.width-width,hero.x-width/2))),

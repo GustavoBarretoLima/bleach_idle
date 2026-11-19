@@ -1,5 +1,6 @@
 import { createRenderer } from './renderer.js';
-import { maps, loot, drops, forms, powers, key, initial, worldSize, cameraFor } from './data.js';
+import { createPresence } from './presence.js';
+import { maps, loot, drops, forms, powers, key, initial, worldSize, cameraFor, plaza, plazaWalkable } from './data.js';
 
 export function createGame(world) {
   let storageOK = true;
@@ -18,6 +19,7 @@ export function createGame(world) {
   const fmt = value => saveNumber.format(value);
   let offlineMessage = '';
   let state = load();
+  const presence=createPresence();
   let hero, enemies, path = [], destination, clock = 0, previousFrame, manualUntil = 0, cooldown = 0, guard = 0,
       block = false, messages = [], effects = [], renderAt = 0, savedAt = 0, fightAt = 0, bossMode = false, hiddenSince = null;
   const keys = new Set();
@@ -66,10 +68,19 @@ export function createGame(world) {
       patrolDirection:index%2===0 ? 1 : -1, alert:false, recover:0,
       charge:0, strikeAt:0, swing:0, hitAt:0, attackAt:-Infinity };
   }
-  function enter(zone) {
+  function startPresence() {
+    presence.start(()=>({
+      x:hero.x,y:hero.y,direction:hero.direction,form:state.form,
+      moving:hero.moving,running:hero.running
+    }));
+  }
+  function enter(zone, inPlaza=false) {
     state.zone=zone;
-    hero={...xy(nowMap().rally),hp:health(),facing:1,direction:'down',gaitTime:0,moving:false,rest:0};
-    enemies=nowMap().spawns.map((p,i)=>foe(p,i));
+    state.inPlaza=inPlaza;
+    if(!inPlaza) presence.stop();
+    const spawn=inPlaza ? {x:484+Math.floor(Math.random()*8)*22,y:plaza.spawnY} : xy(nowMap().rally);
+    hero={...spawn,hp:health(),facing:1,direction:'down',gaitTime:0,moving:false,rest:0};
+    enemies=inPlaza ? [] : nowMap().spawns.map((p,i)=>foe(p,i));
     destination=null;
     path=[];
     bossMode=false;
@@ -81,7 +92,8 @@ export function createGame(world) {
       const {x,y}=cellPoint(i);
       walkable[i]=Number(avoidWall(x,y));
     }
-    paintTerrain(state.zone);
+    paintTerrain(state.zone,inPlaza);
+    if(inPlaza && !document.hidden) startPresence();
   }
   function finish(enemy) {
     const m=nowMap();
@@ -116,6 +128,7 @@ export function createGame(world) {
     if (enemy.hp<=0) finish(enemy);
   }
   function avoidWall(x,y) {
+    if(state.inPlaza) return plazaWalkable(x,y);
     return x>=9 && x<=worldSize.width-9 && y>=12 && y<=worldSize.height-9 && !nowMap().walls.some(([l,t,w,h])=>x>l-6 && x<l+w+6 && y>t-4 && y<t+h+6);
   }
   function cellPoint(index) { return {x:index%nx*cell+8,y:Math.floor(index/nx)*cell+8}; }
@@ -269,7 +282,7 @@ export function createGame(world) {
       hero.running=true;
       move(x*100,y*100,dt*101);
     } else {
-      if(state.auto && clock>=manualUntil && !destination) setDestination(target());
+      if(!state.inPlaza && state.auto && clock>=manualUntil && !destination) setDestination(target());
       const chasing=destination?.max && (far(hero,destination)>25 || !clearToHero(destination));
       if(chasing && clock>=repathAt &&
           (!path.length || far(destination,plannedTarget)>=8)) setDestination(destination);
@@ -306,7 +319,7 @@ export function createGame(world) {
     log('Ren recuou e voltou ao ponto seguro.');
   }
   function harvest(seconds) {
-    if(!state.auto || seconds<12) return;
+    if(state.inPlaza || !state.auto || seconds<12) return;
     const m=nowMap();
     const hits=Math.ceil(m.hp/attack());
     const takes=Math.max(0,Math.ceil((hits-1)*.59/.86)+1);
@@ -374,6 +387,8 @@ export function createGame(world) {
     const remaining = Math.max(0,Math.ceil(cooldown-clock));
     const danger = inDanger();
     snapshot = {
+      inPlaza:state.inPlaza, plazaStatus:presence.status, plazaName:presence.name,
+      plazaCount:presence.players.length+1,
       map, zone:state.zone, unlocked:state.unlocked, cleared:[...state.cleared],
       auto:state.auto, bossMode, bossReady:unlockedBoss(), trail:Math.min(state.kills[state.zone],map.goal),
       hp:Math.ceil(hero.hp), maxHp:health(), xp:state.xp, goalXp:need(), reishi:state.reishi,
@@ -389,9 +404,16 @@ export function createGame(world) {
     listeners.forEach(notify=>notify());
   }
   function openDistrict(index) {
-    if (!maps[index] || index === state.zone || index > state.unlocked) return;
+    if (!maps[index] || (!state.inPlaza && index === state.zone) || index > state.unlocked) return;
     enter(index);
     log('Patrulha em '+nowMap().name+'.');
+    save();
+    publish();
+  }
+  function openPlaza() {
+    if(state.inPlaza) return;
+    enter(state.zone,true);
+    log('Você voltou à Praça Principal.');
     save();
     publish();
   }
@@ -403,6 +425,7 @@ export function createGame(world) {
     publish();
   }
   function trackBoss() {
+    if(state.inPlaza) return;
     if(bossMode) {
       enemies=enemies.filter(enemy=>!enemy.boss);
       setDestination(null);
@@ -443,7 +466,7 @@ export function createGame(world) {
   function pointAt(event) {
     const bounds=world.getBoundingClientRect();
     if(!bounds.width || !bounds.height) return;
-    const camera=cameraFor(hero,world.width,world.height);
+    const camera=cameraFor(state.inPlaza?plaza.center:hero,world.width,world.height);
     const point={
       x:camera.x+(event.clientX-bounds.left)*world.width/bounds.width,
       y:camera.y+(event.clientY-bounds.top)*world.height/bounds.height
@@ -470,20 +493,29 @@ export function createGame(world) {
   function visibility() {
     if(document.hidden) {
       hiddenSince=Date.now();
+      if(state.inPlaza) presence.stop();
       save();
     } else {
       if(hiddenSince!==null) harvest((Date.now()-hiddenSince)/1000);
       hiddenSince=null;
       previousFrame=null;
+      if(state.inPlaza) startPresence();
       save();
       publish();
     }
   }
-  function pagehide() { if(hiddenSince===null) save(); }
+  function pagehide() {
+    presence.stop();
+    if(hiddenSince===null) save();
+  }
+  function pageshow() {
+    if(state.inPlaza && !document.hidden) startPresence();
+  }
   function frame(time) {
     if(!document.hidden) {
       simulate(Math.min(.055,Math.max(0,(time-(previousFrame??time))/1000)));
-      draw({zone:state.zone,form:state.form,hero,enemies,destination,effects,clock,fightAt});
+      draw({zone:state.zone,form:state.form,hero,enemies,destination,effects,clock,fightAt,
+        plazaView:state.inPlaza ? presence : null});
       if(Date.now()-savedAt>=3500) save();
       if(time>=renderAt) {
         renderAt=time+100;
@@ -494,8 +526,8 @@ export function createGame(world) {
     animationId=requestAnimationFrame(frame);
   }
   harvest((Date.now()-state.savedAt)/1000);
-  enter(state.zone);
-  log('Patrulha em '+nowMap().name+'.');
+  enter(state.zone,state.inPlaza ?? true);
+  log(state.inPlaza ? 'Você chegou à Praça Principal.' : 'Patrulha em '+nowMap().name+'.');
   save();
   publish();
   world.addEventListener('pointerdown',pointAt);
@@ -504,6 +536,7 @@ export function createGame(world) {
   document.addEventListener('visibilitychange',visibility);
   window.addEventListener('blur',blur);
   window.addEventListener('pagehide',pagehide);
+  window.addEventListener('pageshow',pageshow);
   animationId=requestAnimationFrame(frame);
   return {
     getSnapshot:()=>snapshot,
@@ -511,7 +544,7 @@ export function createGame(world) {
       listeners.add(notify);
       return ()=>listeners.delete(notify);
     },
-    addPoint,setGear,reinforce,openDistrict,toggleHunt,trackBoss,defend,useSkill,release,
+    addPoint,setGear,reinforce,openDistrict,openPlaza,toggleHunt,trackBoss,defend,useSkill,release,
     dispose() {
       cancelAnimationFrame(animationId);
       world.removeEventListener('pointerdown',pointAt);
@@ -520,6 +553,8 @@ export function createGame(world) {
       document.removeEventListener('visibilitychange',visibility);
       window.removeEventListener('blur',blur);
       window.removeEventListener('pagehide',pagehide);
+      window.removeEventListener('pageshow',pageshow);
+      presence.stop();
       keys.clear();
       listeners.clear();
     }

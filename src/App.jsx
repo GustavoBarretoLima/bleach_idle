@@ -90,7 +90,7 @@ function Bag({ view, game }) {
 
 function Districts({ view, game }) {
   return <><h3>Escolha uma rota</h3>
-    {maps.map(({ name, area, lvl }, index) => <button key={name} className="region" aria-pressed={index === view.zone}
+    {maps.map(({ name, area, lvl }, index) => <button key={name} className="region" aria-pressed={!view.inPlaza && index === view.zone}
       disabled={view.unlocked < index} onClick={() => game.openDistrict(index)}>
       <span><strong>{name}</strong><small>{area}</small></span>
       <small>{view.unlocked < index ? 'Bloqueado' : 'Nv. ' + lvl + (view.cleared[index] ? ' · Limpo' : '')}</small>
@@ -135,6 +135,27 @@ function CharacterPanel({ view, game }) {
   </aside>;
 }
 
+function PlazaControls({ view, game }) {
+  const online=view.plazaStatus==='online';
+  const label=online ? (view.plazaCount===1 ? '1 jogador na praça' : view.plazaCount+' jogadores na praça')
+    : view.plazaStatus==='connecting' ? 'Conectando à praça…' : 'Conexão indisponível. Reconectando…';
+  return <div className="plaza-controls">
+    <div className="plaza-presence">
+      <p role="status" className={online ? 'green' : undefined}>{label}</p>
+      {online && <small>{view.plazaName} · Você</small>}
+    </div>
+    <form onSubmit={event => {
+      event.preventDefault();
+      game.openDistrict(Number(new FormData(event.currentTarget).get('district')));
+    }}>
+      <select aria-label="Distrito de patrulha" name="district" defaultValue={view.zone}>
+        {maps.slice(0,view.unlocked+1).map(({name},index)=><option key={name} value={index}>{name}</option>)}
+      </select>
+      <button type="submit" className="button on">Patrulhar</button>
+    </form>
+  </div>;
+}
+
 function App() {
   const world = useRef(null);
   const [game, setGame] = useState(null);
@@ -154,16 +175,19 @@ function App() {
     {view?.offlineMessage && <p className="summary" role="status">{view.offlineMessage}</p>}
     <div className="grid"><div className="column">
       <section className="panel" aria-labelledby="place">
-        <div className="maphead"><div><h2 id="place">{view?.map.name ?? 'Karakura'}</h2>
-          {view && <small>{view.map.area} · Níveis {view.map.lvl}</small>}</div>
-          {view && <span className="tag">{view.bossMode ? 'Encontro com chefe' : view.auto ? 'Caça automática' : 'Exploração livre'}</span>}
+        <div className="maphead"><div><h2 id="place">{view?.inPlaza || !view ? 'Praça Principal' : view.map.name}</h2>
+          {view && <small>{view.inPlaza ? 'Karakura' : view.map.area + ' · Níveis ' + view.map.lvl}</small>}</div>
+          {view && !view.inPlaza && <div className="patrol-nav">
+            <span className="tag">{view.bossMode ? 'Encontro com chefe' : view.auto ? 'Caça automática' : 'Exploração livre'}</span>
+            <button className="button plaza-return" onClick={game.openPlaza}>Voltar à praça</button>
+          </div>}
         </div>
         <div className="viewport">
-          <canvas ref={world} width="544" height="306" tabIndex={0} aria-label="Mapa de patrulha. Clique ou use WASD para andar." />
+          <canvas ref={world} width="544" height="306" tabIndex={0} aria-label={view?.inPlaza ? "Praça Principal. Toque ou use WASD para andar." : "Mapa de patrulha. Toque ou use WASD para andar."} />
           <span className="risk" role="status" hidden={!view?.warning}>{view?.warning}</span>
           <span className="worldnote">WASD ou toque para andar</span>
         </div>
-        {view && <PatrolControls view={view} game={game} />}
+        {view && (view.inPlaza ? <PlazaControls view={view} game={game} /> : <PatrolControls view={view} game={game} />)}
       </section>
       {view && <section className="panel diary"><h2>Diário da patrulha</h2>
         <ul>{view.messages.map((message,index) => <li key={message + index}>{message}</li>)}</ul>
