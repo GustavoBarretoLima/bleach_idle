@@ -13,7 +13,7 @@ const loadTexture = url => {
 const cityGround=loadTexture(groundUrl);
 const propAtlas=loadTexture(propsUrl);
 const mentorAtlas=loadTexture(mentorsUrl);
-const mentorFrames={shinigami:0,sado:1,inoue:2};
+const mentorFrames={shinigami:0,sado:1,inoue:2,quincy:3};
 
 export function createRenderer(world, reducedMotion) {
   const ctx = world.getContext('2d',{alpha:false});

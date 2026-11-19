@@ -142,7 +142,11 @@ export function createGame(world) {
     if(state.inPlaza) return cityWalkable(x,y);
     return x>=9 && x<=worldSize.width-9 && y>=12 && y<=worldSize.height-9 && !nowMap().walls.some(([l,t,w,h])=>x>l-6 && x<l+w+6 && y>t-4 && y<t+h+6);
   }
-  function cellPoint(index) { return {x:index%nx*cell+8,y:Math.floor(index/nx)*cell+8}; }
+  function cellPoint(index) {
+    const offsetX=state.inPlaza ? city.x%cell : 0;
+    const offsetY=state.inPlaza ? city.y%cell : 0;
+    return {x:index%nx*cell+cell/2+offsetX,y:Math.floor(index/nx)*cell+cell/2+offsetY};
+  }
   function closestCell(point) {
     let best=-1, distance=Infinity;
     for (let i=0;i<nx*ny;i++) {
