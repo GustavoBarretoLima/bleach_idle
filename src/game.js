@@ -1,6 +1,7 @@
 import { createRenderer } from './renderer.js';
 import { createPresence } from './presence.js';
-import { maps, loot, drops, forms, powers, key, initial, worldSize, cameraFor, plaza, plazaWalkable, classPaths, mentors } from './data.js';
+import { city, cityCamera, cityWalkable, encodeCityPosition } from './city.js';
+import { maps, loot, drops, forms, powers, key, initial, worldSize, cameraFor, classPaths, mentors } from './data.js';
 
 export function createGame(world) {
   let storageOK = true;
@@ -78,7 +79,7 @@ export function createGame(world) {
   }
   function startPresence() {
     presence.start(()=>({
-      x:hero.x,y:hero.y,direction:hero.direction,form:state.form,classId:state.classId,
+      ...encodeCityPosition(hero),direction:hero.direction,form:state.form,classId:state.classId,
       moving:hero.moving,running:hero.running
     }));
   }
@@ -86,7 +87,7 @@ export function createGame(world) {
     state.zone=zone;
     state.inPlaza=inPlaza;
     if(!inPlaza) presence.stop();
-    const spawn=inPlaza ? {x:484+Math.floor(Math.random()*8)*22,y:plaza.spawnY} : xy(nowMap().rally);
+    const spawn=inPlaza ? {x:city.spawn.x+Math.floor(Math.random()*7)*8-24,y:city.spawn.y} : xy(nowMap().rally);
     hero={...spawn,hp:health(),facing:1,direction:'down',gaitTime:0,moving:false,rest:0};
     enemies=inPlaza ? [] : nowMap().spawns.map((p,i)=>foe(p,i));
     destination=null;
@@ -138,7 +139,7 @@ export function createGame(world) {
     if (enemy.hp<=0) finish(enemy);
   }
   function avoidWall(x,y) {
-    if(state.inPlaza) return plazaWalkable(x,y);
+    if(state.inPlaza) return cityWalkable(x,y);
     return x>=9 && x<=worldSize.width-9 && y>=12 && y<=worldSize.height-9 && !nowMap().walls.some(([l,t,w,h])=>x>l-6 && x<l+w+6 && y>t-4 && y<t+h+6);
   }
   function cellPoint(index) { return {x:index%nx*cell+8,y:Math.floor(index/nx)*cell+8}; }
@@ -522,7 +523,7 @@ export function createGame(world) {
   function pointAt(event) {
     const bounds=world.getBoundingClientRect();
     if(!bounds.width || !bounds.height) return;
-    const camera=cameraFor(state.inPlaza?plaza.center:hero,world.width,world.height);
+    const camera=(state.inPlaza ? cityCamera : cameraFor)(hero,world.width,world.height);
     const point={
       x:camera.x+(event.clientX-bounds.left)*world.width/bounds.width,
       y:camera.y+(event.clientY-bounds.top)*world.height/bounds.height

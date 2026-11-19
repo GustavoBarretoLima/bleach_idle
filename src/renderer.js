@@ -1,5 +1,19 @@
-import { maps, worldSize, cameraFor, plaza, classPaths, mentors } from './data.js';
+import { maps, worldSize, cameraFor, classPaths, mentors } from './data.js';
 import { drawHeroPose } from './sprites.js';
+import { city, cityCamera, cityProps, decodeCityPosition } from './city.js';
+import groundUrl from './karakura/ground.webp';
+import propsUrl from './karakura/props.webp';
+import mentorsUrl from './karakura/mentors.png';
+
+const loadTexture = url => {
+  const image = new Image();
+  image.src = url;
+  return image;
+};
+const cityGround=loadTexture(groundUrl);
+const propAtlas=loadTexture(propsUrl);
+const mentorAtlas=loadTexture(mentorsUrl);
+const mentorFrames={shinigami:0,sado:1,inoue:2};
 
 export function createRenderer(world, reducedMotion) {
   const ctx = world.getContext('2d',{alpha:false});
@@ -124,89 +138,8 @@ export function createRenderer(world, reducedMotion) {
       }
     }
   }
-  function paintPlaza() {
-    const {left,top,right,bottom}=plaza.bounds;
-    const {left:fx,top:fy,right:fr,bottom:fb}=plaza.fountain;
-    ink(bg,'#26382f',0,0,worldSize.width,worldSize.height);
-    ink(bg,'#191f29',left-19,top-26,right-left+38,bottom-top+52);
-    ink(bg,'#8a7863',left-10,top-10,right-left+20,bottom-top+20);
-    ink(bg,'#61584f',left-6,top-6,right-left+12,bottom-top+12);
-    for(let y=top;y<bottom;y+=15) {
-      for(let x=left;x<right;x+=24) {
-        const key=(x-left)+(y-top)*31;
-        ink(bg,dice(key)>.52?'#786a5c':'#706257',x,y,Math.min(23,right-x),Math.min(14,bottom-y));
-      }
-    }
-
-    for(const x of [341,402,718,779]) {
-      tree(x,top-9,'#547561');
-      tree(x,bottom+16,'#465e57');
-    }
-
-    // Four landmarks frame the central pedestrian square.
-    for(const mentor of mentors) {
-      const {id,x,y}=mentor;
-      const color=classPaths[id].color;
-      const north=y<plaza.center.y;
-      const accent=north ? (id==='shinigami'?'#3f6655':'#495b78') : (id==='sado'?'#725956':'#496452');
-      const plotY=north ? y-49 : y-30;
-      ink(bg,'#403a3c',x-53,plotY,106,north?52:70);
-      ink(bg,accent,x-51,plotY+2,102,north?48:66);
-      for(let i=0;i<6;i++) {
-        ink(bg,'#e4d0a334',x-48,plotY+8+i*8,96,1);
-      }
-      if(north) {
-        building(x-52,y-87,104,58,id==='shinigami'?0:1,{roof:accent});
-        const signY=y-51;
-        ink(bg,'#2a2929',x-45,signY,90,13);
-        ink(bg,color,x-45,signY,90,1);
-        bg.fillStyle='#fff0d7';
-        bg.font='bold 9px monospace';
-        bg.textAlign='center';
-        bg.fillText(mentor.place,x,signY+10);
-      } else if(id==='sado') {
-        ink(bg,'#bfa48b80',x-42,plotY+8,84,1);
-        ink(bg,'#bfa48b80',x-42,plotY+53,84,1);
-        for(const offset of [-38,38]) {
-          ink(bg,'#312b2f',x+offset-4,y-16,8,27);
-          ink(bg,'#a98064',x+offset-3,y-16,6,18);
-          ink(bg,'#cfab81',x+offset-3,y-13,6,2);
-        }
-      } else {
-        for(const offset of [-38,38]) {
-          ellipse(bg,'#273a32',x+offset,y-5,11,16);
-          for(let i=0;i<9;i++) {
-            ink(bg,i%2 ? '#d38895' : '#ffc4b9',x+offset-8+dice(i+offset)*15,y-17+i*2,3,2);
-          }
-        }
-      }
-      ellipse(bg,color+'58',x,y+2,19,8);
-      ellipse(bg,accent,x,y+1,16,6);
-    }
-
-    ellipse(bg,'#26363d80',(fx+fr)/2,fb+3,43,9);
-    ink(bg,'#282c38',fx,fy,fr-fx,fb-fy);
-    ink(bg,'#a39279',fx+3,fy+3,fr-fx-6,fb-fy-8);
-    ink(bg,'#4e7482',fx+7,fy+7,fr-fx-14,fb-fy-16);
-    ink(bg,'#355a70',fx+10,fy+10,fr-fx-20,fb-fy-22);
-    for(let i=0;i<10;i++) ink(bg,'#7ccfd097',fx+11+dice(i)*42,fy+13+dice(i+35)*26,3+i%5,1);
-    ellipse(bg,'#94dae0aa',plaza.center.x,fy+25,16,7);
-    ink(bg,'#729dab',plaza.center.x-3,fy+10,6,18);
-    ink(bg,'#d6f1e8',plaza.center.x-1,fy+6,2,15);
-    for(const x of [386,470,650,734]) {
-      for(const y of [244,407]) {
-        ellipse(bg,'#f8b76059',x,y,15,8);
-        ink(bg,'#603f3b',x-3,y-15,6,16);
-        ink(bg,'#ffd28f',x-5,y-15,10,6);
-        ink(bg,'#f1a766',x-3,y-17,6,2);
-      }
-    }
-  }
   function paintTerrain(zone, inPlaza) {
-    if(inPlaza) {
-      paintPlaza();
-      return;
-    }
+    if(inPlaza) return;
     const map=maps[zone];
     ink(bg,map.ground,0,0,worldSize.width,worldSize.height);
     if(map.arena) paintArena(map);
@@ -283,6 +216,12 @@ export function createRenderer(world, reducedMotion) {
     const step=actor.moving&&!reducedMotion.matches ? Math.floor(clock*12)%2 : 0;
     ctx.save();ctx.translate(Math.round(x),Math.round(y));
     ellipse(ctx,'#171a1bc2',0,2,11,4);
+    const frame=mentor ? mentorFrames[actor.classId] : undefined;
+    if(frame!==undefined && mentorAtlas.naturalWidth) {
+      ctx.drawImage(mentorAtlas,frame*48,0,48,56,-19,-44,38,44);
+      ctx.restore();
+      return;
+    }
     if(mentor || actor.classId !== 'shinigami') {
       civilian(actor,clock,fightAt,mentor);
       ctx.restore();
@@ -408,7 +347,10 @@ export function createRenderer(world, reducedMotion) {
   const remotePlayers=new Map();
   let lastDraw=0;
   function drawPlaza(hero,form,classId,online,clock) {
-    const both=[...online.players];
+    const both=online.players.flatMap(player=>{
+      const position=decodeCityPosition(player);
+      return position ? [{...player,...position}] : [];
+    });
     const present=new Set(both.map(player=>player.id));
     for(const id of remotePlayers.keys()) if(!present.has(id)) remotePlayers.delete(id);
     const elapsed=Math.max(0,Math.min(.06,clock-lastDraw));
@@ -435,7 +377,13 @@ export function createRenderer(world, reducedMotion) {
     }
     const self={...hero,name:online.name??'Você',form,classId};
     const guides=mentors.map(mentor=>({...mentor,name:mentor.label,classId:mentor.id,mentor:true,direction:'down',facing:1}));
-    for(const actor of [...remotePlayers.values(),self,...guides].sort((a,b)=>a.y-b.y)) {
+    const actors=[...remotePlayers.values(),self,...guides];
+    for(const actor of [...cityProps,...actors].sort((a,b)=>(a.sortY??a.y)-(b.sortY??b.y))) {
+      if(actor.region) {
+        const [u,v,w,h]=actor.region;
+        if(propAtlas.naturalWidth) ctx.drawImage(propAtlas,u,v,w,h,actor.x,actor.y,w,h);
+        continue;
+      }
       character(actor.x,actor.y,actor,actor.form,clock,0,actor.mentor);
       ctx.font='bold 10px monospace';
       ctx.textAlign='center';
@@ -451,10 +399,14 @@ export function createRenderer(world, reducedMotion) {
     }
   }
   function draw({zone,form,classId,hero,enemies,destination,effects,clock,fightAt,plazaView}) {
-    const camera=cameraFor(plazaView?plaza.center:hero,width,height);
-    ctx.drawImage(background,camera.x,camera.y,width,height,0,0,width,height);
+    const camera=(plazaView ? cityCamera : cameraFor)(hero,width,height);
+    if(!plazaView) ctx.drawImage(background,camera.x,camera.y,width,height,0,0,width,height);
+    else ink(ctx,'#30383b',0,0,width,height);
     ctx.save();
     ctx.translate(-camera.x,-camera.y);
+    if(plazaView && cityGround.naturalWidth) {
+      ctx.drawImage(cityGround,city.x,city.y,city.width,city.height);
+    }
     if(destination && !destination.max) {
       ellipse(ctx,'#d9e5ce75',destination.x,destination.y,7,4);
       ellipse(ctx,'#233629',destination.x,destination.y,4,2);

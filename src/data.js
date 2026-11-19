@@ -1,9 +1,7 @@
 export const worldSize = {width:1120,height:640};
 export const plaza = {
-  center:{x:560,y:320},
   bounds:{left:316,top:201,right:804,bottom:443},
-  fountain:{left:526,top:285,right:594,bottom:339},
-  spawnY:388
+  fountain:{left:526,top:285,right:594,bottom:339}
 };
 
 export const classPaths = {
@@ -14,20 +12,20 @@ export const classPaths = {
 };
 
 export const mentors = [
-  {id:'shinigami', name:'Kisuke Urahara', label:'Urahara', place:'Loja Urahara', x:386, y:266, approachY:288,
+  {id:'shinigami', name:'Kisuke Urahara', label:'Urahara', place:'Loja Urahara', x:610, y:450, approachY:463,
     dialogue:'Se consegue sentir a pressão espiritual da cidade, já tem por onde começar. Passe na minha loja e vamos despertar sua lâmina.'},
-  {id:'quincy', name:'Ryūken Ishida', label:'Ryūken', place:'Clínica Ishida', x:734, y:266, approachY:288,
+  {id:'quincy', name:'Ryūken Ishida', label:'Ryūken', place:'Clínica Ishida', x:716, y:451, approachY:463,
     dialogue:'Uma flecha Quincy começa pela concentração. Posso ensinar você a reunir o Reishi ao seu redor e dar forma a ele.'},
-  {id:'sado', name:'Yasutora “Chad” Sado', label:'Sado', place:'Pátio de Treino', x:386, y:387, approachY:410,
+  {id:'sado', name:'Yasutora “Chad” Sado', label:'Sado', place:'Pátio de Treino', x:416, y:445, approachY:463,
     dialogue:'Força vale mais quando você tem alguém para proteger. Se quiser treinar comigo, começamos por aí.'},
-  {id:'inoue', name:'Orihime Inoue', label:'Inoue', place:'Jardim de Karakura', x:734, y:387, approachY:410,
+  {id:'inoue', name:'Orihime Inoue', label:'Inoue', place:'Jardim de Karakura', x:765, y:446, approachY:463,
     dialogue:'Quando alguém se machuca, eu penso em como posso ajudar. Posso mostrar como meu escudo protege e recupera.'}
 ];
 
 export function plazaWalkable(x,y) {
   const {bounds,fountain}=plaza;
   return x>=bounds.left && x<=bounds.right && y>=bounds.top && y<=bounds.bottom &&
-    !mentors.some(mentor=>mentor.y<plaza.center.y && Math.abs(x-mentor.x)<57 && y<mentor.y-25) &&
+    !(y<241 && (Math.abs(x-386)<57 || Math.abs(x-734)<57)) &&
     !(x>fountain.left-4 && x<fountain.right+4 && y>fountain.top-4 && y<fountain.bottom+4);
 }
 
