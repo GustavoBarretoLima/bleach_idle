@@ -1,0 +1,193 @@
+import { maps } from './data.js';
+import { drawHeroPose } from './sprites.js';
+
+export function createRenderer(world, reducedMotion) {
+  const ctx = world.getContext('2d',{alpha:false});
+  ctx.imageSmoothingEnabled = false;
+  const { width, height } = world;
+  const background = document.createElement('canvas');
+  background.width = width;
+  background.height = height;
+  const bg = background.getContext('2d');
+  function ink(c,color,x,y,w,h) { c.fillStyle=color;c.fillRect(Math.floor(x),Math.floor(y),w,h); }
+  function shape(c,color,points) {
+    c.fillStyle=color;
+    c.beginPath();
+    c.moveTo(...points[0]);
+    for(const p of points.slice(1)) c.lineTo(...p);
+    c.closePath();
+    c.fill();
+  }
+  function ellipse(c,color,x,y,w,h) {
+    c.fillStyle=color;
+    c.beginPath();
+    c.ellipse(x,y,w,h,0,0,Math.PI*2);
+    c.fill();
+  }
+  function dice(n) { return ((Math.imul(n+81,2654435761)>>>11)%1000)/1000; }
+  function tree(x,y,tint) {
+    ellipse(bg,'#1b28256d',x+3,y+9,12,6);
+    ink(bg,'#49382f',x-2,y-2,5,12);
+    shape(bg,'#202e29',[[x-13,y+2],[x-16,y-7],[x-10,y-17],[x-3,y-20],[x+9,y-17],[x+15,y-9],[x+13,y+2],[x+2,y+7]]);
+    shape(bg,tint,[[x-13,y-6],[x-8,y-15],[x+2,y-19],[x+11,y-14],[x+14,y-8],[x+8,y],[x-5,y+2]]);
+    ink(bg,'#82866b60',x-7,y-13,9,3);
+    ink(bg,'#a8a58055',x-10,y-7,5,2);
+  }
+  function building(x,y,w,h,id,palette) {
+    ink(bg,'#17211e77',x+5,y+7,w+6,h+5);
+    ink(bg,'#292a2c',x,y+h-22,w,23);
+    ink(bg,'#847a67',x+2,y+h-20,w-4,16);
+    for(let j=12;j<w-12;j+=25) {
+      ink(bg,'#423b36',x+j,y+h-17,11,9);
+      ink(bg,j%2===0?'#dfaf76':'#a5957e',x+j+2,y+h-15,7,5);
+      ink(bg,'#675243',x+j+5,y+h-15,1,5);
+    }
+    ink(bg,'#3b3637',x+w/2-7,y+h-18,14,17);
+    ink(bg,'#b1a184',x+w/2+3,y+h-10,2,2);
+    shape(bg,'#252a32',[[x-3,y+h-19],[x-3,y+15],[x+12,y-1],[x+w-11,y-1],[x+w+4,y+15],[x+w+4,y+h-19]]);
+    shape(bg,palette.roof,[[x,y+h-23],[x,y+16],[x+14,y+2],[x+w-13,y+2],[x+w,y+16],[x+w,y+h-23]]);
+    const ridge=y+Math.floor((h-20)*.46);
+    ink(bg,'#a2a7b54a',x+3,ridge,w-6,3);
+    for(let j=8;j<w-7;j+=8) {
+      ink(bg,'#161d2944',x+j,y+13,1,h-38);
+      ink(bg,'#a6aec426',x+j+1,y+15,2,h-40);
+    }
+    for(let j=13;j<h-21;j+=7) ink(bg,'#20242f60',x+4,y+j,w-8,1);
+    if(id%2===0) {
+      ink(bg,'#302e33',x+w-27,y+10,10,15);
+      ink(bg,'#807b75',x+w-25,y+9,9,5);
+    }
+  }
+  function paintTerrain(zone) {
+    const m=maps[zone], purple=zone===2;
+    ink(bg,m.ground,0,0,width,height);
+    for(let i=0;i<820;i++) {
+      const x=dice(i*6)*width,y=dice(i*6+1)*height;
+      ink(bg,i%3===0?'#e0d8a526':'#181f2528',x,y,2+i%4,1+i%2);
+    }
+    ink(bg,'#202c29',0,110,width,96);
+    ink(bg,'#969188',0,113,width,89);
+    ink(bg,m.road,0,124,width,67);
+    const roadX=zone===1?347:310;
+    ink(bg,'#949489',roadX-32,0,60,height);
+    ink(bg,m.road,roadX-22,0,41,height);
+    for(let x=0;x<width;x+=24) {
+      ink(bg,'#d1c6a067',x,156,11,2);
+      ink(bg,'#454b48',x,117,1,7);
+      ink(bg,'#454b48',x,191,1,8);
+      if(x%3===0) ink(bg,'#282f34a0',x+3,129+x%53,5,1);
+    }
+    for(let y=0;y<height;y+=22) ink(bg,'#d1c6a067',roadX-3,y,2,8);
+    for(let x=roadX-21;x<roadX+19;x+=6) {
+      ink(bg,'#d6cfac78',x,127,3,9);
+      ink(bg,'#d6cfac78',x,177,3,9);
+    }
+    const trees=[[19,99],[147,93],[213,95],[342,96],[513,104],[24,211],[162,221],[288,215],[378,215],[521,213]];
+    for(const [x,y] of trees) tree(x,y,purple?'#74617b':'#4f6850');
+    m.walls.forEach(([x,y,w,h],index)=>building(x,y,w,h,index,m));
+    for(const [x,y] of [[50,115],[225,113],[360,114],[500,113],[72,195],[259,196],[401,197]]) {
+      ellipse(bg,'#f2ab4937',x,y+2,10,7);
+      ink(bg,'#292d32',x,y-11,2,12);
+      ink(bg,'#ffcf86',x-3,y-12,8,3);
+    }
+    const [ax,ay]=m.altar;
+    ellipse(bg,'#352c3c93',ax,ay,19,11);
+    ellipse(bg,'#d6a4f28c',ax,ay,15,8);
+    ellipse(bg,m.road,ax,ay,12,6);
+    ink(bg,'#edc6ff',ax-1,ay-2,3,5);
+    bg.strokeStyle='#12191c';
+    bg.lineWidth=4;
+    bg.strokeRect(0,0,width,height);
+  }
+  function character(x,y,actor,form,clock,fightAt) {
+    const step=actor.moving&&!reducedMotion.matches ? Math.floor(clock*12)%2 : 0;
+    ctx.save();ctx.translate(Math.round(x),Math.round(y));
+    ellipse(ctx,'#171a1bc2',0,2,11,4);
+    if(form) ellipse(ctx,form===2?'#ecaed04c':'#a69ae451',0,-9,13,15);
+    if (drawHeroPose(ctx,actor,form,clock,fightAt,reducedMotion.matches)) {
+      ctx.restore();
+      return;
+    }
+    ctx.scale(actor.facing,1);
+    ink(ctx,'#121722',-7,-12,14,13);
+    ink(ctx,'#222836',-6,-12,12,8);
+    ink(ctx,'#4a5069',-8,-14,6,10);
+    ink(ctx,'#5d6179',-7,-14,4,3);
+    ink(ctx,'#121722',-6,-4-step*2,5,8);
+    ink(ctx,'#121722',2,-4+step*2,5,6);
+    ink(ctx,'#d6cbd9',-5,-8,11,2);
+    ink(ctx,'#242632',-6,-25,12,12);
+    ink(ctx,'#6a6687',-5,-25,9,3);
+    ink(ctx,'#efbd99',-3,-20,10,7);
+    ink(ctx,'#242632',-5,-23,6,8);
+    ink(ctx,'#333248',4,-18,2,1);
+    ink(ctx,'#e6b69e',5,-12,4,5);
+    shape(ctx,form===2?'#ffb8d9':form===1?'#ccbbff':'#edf3ee',[[7,-7],[20,-16],[23,-17],[21,-12],[9,-4]]);
+    ink(ctx,'#cd9c6d',6,-9,3,7);
+    if(!reducedMotion.matches && clock-fightAt<.18 && fightAt>0) {
+      shape(ctx,'#fff1daaa',[[13,-25],[24,-18],[24,-9],[15,1],[19,-10],[19,-17]]);
+    }
+    ctx.restore();
+  }
+  function monster(enemy,zone,clock) {
+    const {x,y,boss,hp,max}=enemy;
+    if(hp<=0) return;
+    const scale=boss?1.58:1;
+    if(enemy.charge) {
+      ellipse(ctx,'#eb725b6f',x,y,33,20);
+      ellipse(ctx,'#ee9b7652',x,y,24,14);
+    }
+    ctx.save();ctx.translate(x,y);ctx.scale(scale,scale);
+    ellipse(ctx,'#151821b0',0,1,11,4);
+    const hover = reducedMotion.matches ? 0 : Math.round((1 + Math.sin(clock*4+enemy.index)) * 1.5);
+    ctx.translate(0,-hover);
+    const flash=enemy.hitAt>0 && clock-enemy.hitAt<.13;
+    const cloth=flash ? '#a37c8b' : ['#392c45','#3a4443','#493a62'][zone];
+    shape(ctx,cloth,[[-10,-4],[-8,-16],[-4,-22],[5,-21],[10,-14],[11,-4],[7,1],[3,-4],[-1,2],[-5,-3]]);
+    shape(ctx,'#b4a9b5',[[-7,-21],[-5,-26],[4,-26],[8,-22],[7,-16],[2,-12],[-4,-14],[-7,-17]]);
+    ink(ctx,'#ede4e5',-5,-24,10,5);
+    ink(ctx,'#2f2435',-4,-21,3,2);
+    ink(ctx,'#2f2435',2,-21,3,2);
+    ink(ctx,'#583e56',-2,-16,4,2);
+    if(boss) {
+      shape(ctx,'#d5b8b5',[[-7,-21],[-12,-28],[-12,-35],[-6,-31],[-3,-25]]);
+      shape(ctx,'#d5b8b5',[[5,-26],[10,-33],[12,-34],[11,-25],[8,-19]]);
+    }
+    ink(ctx,'#25202b',-12,-32,24,4);
+    ink(ctx,boss?'#ffad8f':'#af7179',-11,-31,Math.ceil(22*hp/max),2);
+    ctx.restore();
+  }
+  function draw({zone,form,hero,enemies,destination,effects,clock,fightAt}) {
+    ctx.drawImage(background,0,0);
+    if(destination && !destination.max) {
+      ellipse(ctx,'#d9e5ce75',destination.x,destination.y,7,4);
+      ellipse(ctx,'#233629',destination.x,destination.y,4,2);
+    }
+    const living=enemies.filter(e=>e.hp>0);
+    for(const actor of [...living,hero].sort((a,b)=>a.y-b.y)) {
+      if(actor===hero) character(hero.x,hero.y,hero,form,clock,fightAt);
+      else monster(actor,zone,clock);
+    }
+    const targetEnemy=destination?.max && destination.hp>0 ? destination : null;
+    if(targetEnemy) {
+      const label=targetEnemy.boss?maps[zone].boss:maps[zone].foe;
+      ctx.font='bold 11px monospace';
+      ctx.textAlign='center';
+      const labelWidth=ctx.measureText(label).width;
+      const x=Math.max(labelWidth/2+4,Math.min(width-labelWidth/2-4,targetEnemy.x));
+      const y=targetEnemy.y-(targetEnemy.boss?58:38);
+      ink(ctx,'#1e1e25dc',x-labelWidth/2-3,y-10,labelWidth+6,13);
+      ctx.fillStyle='#f6e6d2';ctx.fillText(label,x,y);
+    }
+    ctx.font='bold 12px monospace';
+    ctx.textAlign='center';
+    for(const f of effects) {
+      const dy=reducedMotion.matches ? 0 : Math.max(0,(.58-(f.until-clock))*22);
+      ctx.strokeStyle='#272126';ctx.lineWidth=3;
+      ctx.strokeText(f.text,f.x,f.y-dy);
+      ctx.fillStyle=f.color;ctx.fillText(f.text,f.x,f.y-dy);
+    }
+  }
+
+  return { paintTerrain, draw };
+}
