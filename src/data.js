@@ -1,13 +1,27 @@
+export const worldSize = {width:1120,height:640};
+export function cameraFor(hero, width, height) {
+  return {
+    x:Math.round(Math.max(0,Math.min(worldSize.width-width,hero.x-width/2))),
+    y:Math.round(Math.max(0,Math.min(worldSize.height-height,hero.y-height/2)))
+  };
+}
+
 export const maps = [
-  {name:'Karakura', area:'Rua do Santuário', lvl:'1–4', foe:'Hollow Errante', boss:'Máscara de Cinzas', hp:37, dmg:5, exp:8, cash:8, goal:6, bossHp:198, bossDmg:27, ground:'#3c5143', road:'#4b5155', roof:'#4e5268',
-    walls:[[18,18,116,61],[165,14,133,65],[373,19,152,65],[16,220,130,67],[179,231,91,56],[395,231,129,56]],
-    spawns:[[76,117],[186,141],[284,115],[447,131],[92,187],[357,203],[487,188]], rally:[240,173], altar:[472,173]},
-  {name:'Distrito do Vapor', area:'Oficinas abandonadas', lvl:'4–9', foe:'Hollow do Vapor', boss:'Carcereiro da Névoa', hp:78, dmg:10, exp:15, cash:15, goal:8, bossHp:380, bossDmg:47, ground:'#43504b',road:'#505858',roof:'#59604b',
-    walls:[[23,29,130,65],[200,20,184,63],[425,27,98,82],[14,221,117,66],[209,211,134,74],[407,211,117,78]],
-    spawns:[[68,129],[177,131],[315,121],[462,143],[108,176],[383,169],[471,188]], rally:[257,154], altar:[398,148]},
-  {name:'Fenda da Lua', area:'Travessia espiritual', lvl:'9+', foe:'Hollow Espectral', boss:'Vigia da Fenda', hp:151, dmg:17, exp:26, cash:27, goal:10, bossHp:680, bossDmg:72, ground:'#4f4a59',road:'#535062',roof:'#655273',
-    walls:[[31,21,108,65],[221,16,110,63],[410,22,108,65],[19,223,144,54],[220,220,94,63],[411,218,105,69]],
-    spawns:[[77,121],[178,132],[278,118],[453,132],[93,172],[351,201],[483,186]], rally:[258,165], altar:[477,167]}
+  {name:'Karakura', area:'Rua do Santuário', lvl:'1–4', foe:'Hollow Errante', boss:'Máscara de Cinzas', hp:37, dmg:5, exp:8, cash:8, goal:6, bossHp:198, bossDmg:27, ground:'#3c5143', road:'#4b5155', roof:'#4e5268', roadX:[310,821],
+    walls:[[18,18,116,61],[165,14,133,65],[373,19,152,65],[16,220,130,67],[179,231,91,56],[395,231,129,56],
+      [580,27,178,62],[885,32,190,79],[602,237,142,103],[884,234,164,102],
+      [62,334,166,57],[403,339,130,57],[45,511,190,85],[421,530,126,65],[585,511,151,81],[874,515,183,83]],
+    spawns:[[76,117],[186,141],[284,115],[447,131],[92,187],[357,203],[487,188],[654,154],[975,169],[819,288],[297,386],[175,450],[607,450],[944,446]], rally:[240,173], altar:[994,457]},
+  {name:'Distrito do Vapor', area:'Oficinas abandonadas', lvl:'4–9', foe:'Hollow do Vapor', boss:'Carcereiro da Névoa', hp:78, dmg:10, exp:15, cash:15, goal:8, bossHp:380, bossDmg:47, ground:'#43504b',road:'#505858',roof:'#59604b', roadX:[347,775],
+    walls:[[23,29,130,65],[200,20,184,63],[425,27,98,82],[14,221,117,66],[209,211,134,74],[407,211,117,78],
+      [572,19,143,79],[858,25,205,78],[573,229,142,114],[841,234,233,80],
+      [36,327,120,66],[453,327,68,75],[34,531,197,62],[421,512,129,82],[576,529,121,81],[847,516,224,88]],
+    spawns:[[68,129],[177,131],[315,121],[462,143],[108,176],[383,169],[471,188],[623,159],[944,162],[775,298],[326,367],[201,450],[624,472],[954,428]], rally:[257,154], altar:[1013,455]},
+  {name:'Fenda da Lua', area:'Travessia espiritual', lvl:'9+', foe:'Hollow Espectral', boss:'Vigia da Fenda', hp:151, dmg:17, exp:26, cash:27, goal:10, bossHp:680, bossDmg:72, ground:'#192b37',road:'#1b2f3b',roof:'#425066', arena:true,
+    walls:[[31,21,108,65],[221,16,110,63],[410,22,108,65],[19,223,144,54],[220,220,94,63],[411,218,105,69],
+      [623,53,112,57],[929,73,101,45],[660,247,83,68],[917,236,119,91],
+      [83,394,93,47],[333,433,91,75],[139,535,86,63],[598,536,94,54],[910,526,130,70]],
+    spawns:[[77,121],[178,132],[278,118],[453,132],[93,172],[351,201],[483,186],[633,147],[861,175],[790,307],[221,399],[241,479],[565,475],[936,399]], rally:[258,165], altar:[997,451]}
 ];
 export const loot = {
   steel:{name:'Lâmina do Vigia',slot:'blade',stat:5,rarity:'Comum',style:''},

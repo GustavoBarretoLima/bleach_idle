@@ -1,5 +1,5 @@
 import { createRenderer } from './renderer.js';
-import { maps, loot, drops, forms, powers, key, initial } from './data.js';
+import { maps, loot, drops, forms, powers, key, initial, worldSize, cameraFor } from './data.js';
 
 export function createGame(world) {
   let storageOK = true;
@@ -21,9 +21,12 @@ export function createGame(world) {
   let hero, enemies, path = [], destination, clock = 0, previousFrame, manualUntil = 0, cooldown = 0, guard = 0,
       block = false, messages = [], effects = [], renderAt = 0, savedAt = 0, fightAt = 0, bossMode = false, hiddenSince = null;
   const keys = new Set();
+  let plannedTarget, repathAt = 0;
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const {paintTerrain, draw} = createRenderer(world, reducedMotion);
-  const width = world.width, height = world.height, nx = 34, ny = 19, cell = 16;
+  const cell = 16;
+  const nx = Math.ceil(worldSize.width/cell), ny = Math.ceil(worldSize.height/cell);
+  let walkable;
   const nowMap = () => maps[state.zone];
   const attack = () => 13+(state.level-1)*3+state.str*4+state.form*8+state.legacyBlade*5+(state.gear.blade ? itemStat(state.gear.blade) : 0);
   const health = () => 80+(state.level-1)*10+state.vit*14+state.legacyArmor*24+(state.gear.armor ? itemStat(state.gear.armor) : 0);
@@ -57,8 +60,11 @@ export function createGame(world) {
     if (!quiet) log('Item coletado: '+loot[id].name+'.');
   }
   function foe(point,index,boss=false) {
+    const demi = !boss && state.zone === 0 && index % 2 === 0;
     const max = boss ? nowMap().bossHp : nowMap().hp;
-    return {...xy(point),index,boss,hp:max,max,recover:0,charge:0,swing:0,hitAt:0};
+    return {...xy(point),home:xy(point),index,boss,demi,hp:max,max,
+      patrolDirection:index%2===0 ? 1 : -1, alert:false, recover:0,
+      charge:0, strikeAt:0, swing:0, hitAt:0, attackAt:-Infinity };
   }
   function enter(zone) {
     state.zone=zone;
@@ -70,12 +76,17 @@ export function createGame(world) {
     block=false;
     effects=[];
     manualUntil=0;
+    walkable=new Uint8Array(nx*ny);
+    for(let i=0;i<walkable.length;i++) {
+      const {x,y}=cellPoint(i);
+      walkable[i]=Number(avoidWall(x,y));
+    }
     paintTerrain(state.zone);
   }
   function finish(enemy) {
     const m=nowMap();
     enemy.hp=0;
-    enemy.recover=3.4;
+    enemy.recover=clock+3.4;
     effects.push({x:enemy.x,y:enemy.y-12,text:'+'+m.cash+' ◇',color:'#ffce91',until:clock+1.1});
     if (enemy.boss) {
       bossMode=false;
@@ -105,14 +116,14 @@ export function createGame(world) {
     if (enemy.hp<=0) finish(enemy);
   }
   function avoidWall(x,y) {
-    return x>=9 && x<=width-9 && y>=12 && y<=height-9 && !nowMap().walls.some(([l,t,w,h])=>x>l-6 && x<l+w+6 && y>t-4 && y<t+h+6);
+    return x>=9 && x<=worldSize.width-9 && y>=12 && y<=worldSize.height-9 && !nowMap().walls.some(([l,t,w,h])=>x>l-6 && x<l+w+6 && y>t-4 && y<t+h+6);
   }
   function cellPoint(index) { return {x:index%nx*cell+8,y:Math.floor(index/nx)*cell+8}; }
   function closestCell(point) {
     let best=-1, distance=Infinity;
     for (let i=0;i<nx*ny;i++) {
+      if (!walkable[i]) continue;
       const center=cellPoint(i);
-      if (!avoidWall(center.x,center.y)) continue;
       const d=far(point,center);
       if (d<distance) { best=i;distance=d; }
     }
@@ -127,8 +138,7 @@ export function createGame(world) {
       const current=queue[i], x=current%nx;
       for(const next of [x>0?current-1:-1,x<nx-1?current+1:-1,current-nx,current+nx]) {
         if(next<0 || next>=parents.length || parents[next]!==-1) continue;
-        const coords=cellPoint(next);
-        if (!avoidWall(coords.x,coords.y)) continue;
+        if (!walkable[next]) continue;
         parents[next]=current;
         queue.push(next);
       }
@@ -143,7 +153,9 @@ export function createGame(world) {
   }
   function setDestination(next) {
     destination=next;
-    path=next ? route(next) : [];
+    plannedTarget=next?.max ? {x:next.x,y:next.y} : null;
+    path=next ? route(plannedTarget??next) : [];
+    repathAt=clock+.3;
   }
   function face(dx,dy) {
     if (Math.abs(dx)>=Math.abs(dy) && dx) {
@@ -168,6 +180,76 @@ export function createGame(world) {
       return !best || far(hero,enemy)<far(hero,best) ? enemy : best;
     },null);
   }
+  function stepEnemy(enemy, point, maxStep) {
+    const distance=far(enemy,point);
+    if(distance<.25) return true;
+    const step=Math.min(distance,maxStep);
+    const dx=(point.x-enemy.x)*step/distance, dy=(point.y-enemy.y)*step/distance;
+    if(avoidWall(enemy.x+dx,enemy.y+dy)) {
+      enemy.x+=dx;
+      enemy.y+=dy;
+      return true;
+    }
+    if(dx && avoidWall(enemy.x+dx,enemy.y)) {
+      enemy.x+=dx;
+      return true;
+    }
+    if(dy && avoidWall(enemy.x,enemy.y+dy)) {
+      enemy.y+=dy;
+      return true;
+    }
+    return false;
+  }
+  function clearToHero(enemy) {
+    for(const part of [.25,.5,.75]) {
+      if(!avoidWall(enemy.x+(hero.x-enemy.x)*part,enemy.y+(hero.y-enemy.y)*part)) return false;
+    }
+    return true;
+  }
+  function moveEnemy(enemy, dt) {
+    if(enemy.charge || enemy.strikeAt) return;
+    const distance=far(hero,enemy), homeDistance=far(hero,enemy.home);
+    const leash=enemy.boss ? 92 : 76;
+    const canEngage=clock>=hero.rest && (!bossMode || enemy.boss);
+    enemy.alert=canEngage && homeDistance<=leash &&
+      (enemy.alert || (distance<=(enemy.boss?72:52) && clearToHero(enemy)));
+    if(enemy.alert) {
+      if(distance>(enemy.boss?30:21)) stepEnemy(enemy,hero,dt*(enemy.boss?35:enemy.demi?37:43));
+      return;
+    }
+
+    const span=enemy.boss ? 12 : 16+enemy.index%3*4;
+    const patrolPoint={
+      x:enemy.home.x+enemy.patrolDirection*span,
+      y:enemy.home.y+(enemy.index%3===0 ? enemy.patrolDirection*7 : 0)
+    };
+    if(far(enemy,patrolPoint)<1 || !stepEnemy(enemy,patrolPoint,dt*(enemy.demi?19:24))) {
+      enemy.patrolDirection*=-1;
+    }
+  }
+  function attackHero(enemy) {
+    if(enemy.boss) {
+      if(enemy.charge && clock>=enemy.charge) {
+        enemy.charge=0;
+        enemy.attackAt=clock;
+        if(far(hero,enemy)<=36 && clearToHero(enemy)) hurt(block ? Math.ceil(nowMap().bossDmg/4) : nowMap().bossDmg);
+        block=false;
+      } else if(!enemy.charge && enemy.alert && far(hero,enemy)<=36 && clock>=enemy.swing && clearToHero(enemy)) {
+        enemy.charge=clock+1.1;
+        enemy.swing=clock+2.6;
+      }
+      return;
+    }
+    const inReach=far(hero,enemy)<=25 && clearToHero(enemy);
+    if(enemy.strikeAt && clock>=enemy.strikeAt) {
+      enemy.strikeAt=0;
+      enemy.attackAt=clock;
+      if(inReach) hurt(nowMap().dmg);
+    } else if(!enemy.strikeAt && enemy.alert && inReach && clock>=enemy.swing) {
+      enemy.strikeAt=clock+.3;
+      enemy.swing=clock+.95;
+    }
+  }
   function simulate(dt) {
     clock+=dt;
     hero.moving=false;
@@ -175,6 +257,7 @@ export function createGame(world) {
     effects=effects.filter(effect=>effect.until>clock);
     enemies.forEach(e=>{
       if (e.hp<=0 && !e.boss && clock>=e.recover) Object.assign(e,foe(nowMap().spawns[e.index],e.index));
+      if (e.hp>0) moveEnemy(e,dt);
     });
     if (clock<hero.rest) return;
     const x=Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'));
@@ -187,30 +270,20 @@ export function createGame(world) {
       move(x*100,y*100,dt*101);
     } else {
       if(state.auto && clock>=manualUntil && !destination) setDestination(target());
-      if(path.length && (!destination?.max || far(hero,destination)>25)) {
+      const chasing=destination?.max && (far(hero,destination)>25 || !clearToHero(destination));
+      if(chasing && clock>=repathAt &&
+          (!path.length || far(destination,plannedTarget)>=8)) setDestination(destination);
+      if(path.length && (!destination?.max || chasing)) {
         const next=path[0];
         if(far(hero,next)<3) path.shift();
         else move(next.x-hero.x,next.y-hero.y,dt*82);
       } else if(destination && !destination.max && !path.length) destination=null;
     }
     const enemy=destination?.max && destination.hp>0 ? destination : null;
-    if(enemy && far(hero,enemy)<=27 && clock-fightAt>=.59) strike(enemy,attack());
+    if(enemy && far(hero,enemy)<=27 && clock-fightAt>=.59 && clearToHero(enemy)) strike(enemy,attack());
     for (const e of enemies) {
-      if (e.hp<=0 || !e.hitAt) continue;
-      const near=far(hero,e)<=36;
-      if(e.boss && e.charge && clock>=e.charge) {
-        e.charge=0;
-        if(near) hurt(block ? Math.ceil(nowMap().bossDmg/4) : nowMap().bossDmg);
-        block=false;
-      } else if(near && clock>=e.swing) {
-        if(e.boss) {
-          e.charge=clock+1.1;
-          e.swing=clock+2.6;
-        } else {
-          e.swing=clock+.86;
-          hurt(nowMap().dmg);
-        }
-      }
+      if(e.hp<=0 || (bossMode && !e.boss)) continue;
+      attackHero(e);
       if(clock<hero.rest) break;
     }
     if(!enemy && clock>=hero.rest) hero.hp=Math.min(health(),hero.hp+dt*(3+state.level*.4));
@@ -225,6 +298,10 @@ export function createGame(world) {
     path=[];
     destination=null;
     block=false;
+    for(const enemy of enemies) {
+      enemy.alert=false;
+      enemy.strikeAt=0;
+    }
     Object.assign(hero,xy(nowMap().rally),{hp:health(),rest:clock+2.4});
     log('Ren recuou e voltou ao ponto seguro.');
   }
@@ -333,6 +410,10 @@ export function createGame(world) {
       block=false;
     } else if(unlockedBoss()) {
       bossMode=true;
+      for(const enemy of enemies) {
+        enemy.alert=false;
+        enemy.strikeAt=0;
+      }
       const boss=foe(nowMap().altar,-1,true);
       enemies.push(boss);
       setDestination(boss);
@@ -361,10 +442,18 @@ export function createGame(world) {
   }
   function pointAt(event) {
     const bounds=world.getBoundingClientRect();
-    const point={x:(event.clientX-bounds.left)*width/bounds.width,y:(event.clientY-bounds.top)*height/bounds.height};
+    if(!bounds.width || !bounds.height) return;
+    const camera=cameraFor(hero,world.width,world.height);
+    const point={
+      x:camera.x+(event.clientX-bounds.left)*world.width/bounds.width,
+      y:camera.y+(event.clientY-bounds.top)*world.height/bounds.height
+    };
     const enemy=enemies.filter(e=>e.hp>0).reduce((best,e)=>{
-      const range=far(point,{x:e.x,y:e.y-(e.boss?17:9)});
-      return range<19 && (!best || range<best.range) ? {e,range} : best;
+      const headY=e.y-(e.boss?46:e.demi?34:27);
+      const bodyY=e.y-(e.boss?17:9);
+      const nearestY=Math.max(headY,Math.min(bodyY,point.y));
+      const range=far(point,{x:e.x,y:nearestY});
+      return range<(e.boss?24:19) && (!best || range<best.range) ? {e,range} : best;
     },null);
     manualUntil=clock+3;
     setDestination(enemy?.e??point);
