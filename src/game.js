@@ -1,6 +1,7 @@
 import { createRenderer } from './renderer.js';
 import { createPresence } from './presence.js';
 import { city, cityCamera, cityWalkable, encodeCityPosition } from './city.js';
+import { hospital, hospitalWalkable } from './hospital.js';
 import { maps, loot, drops, forms, powers, key, initial, worldSize, cameraFor, classPaths, mentors } from './data.js';
 
 export function createGame(world) {
@@ -27,7 +28,8 @@ export function createGame(world) {
   const state = load();
   const classInfo = () => classPaths[state.classId];
   const attackRange = () => classInfo()?.range ?? 27;
-  let walkingToMentor = null, activeMentor = null;
+  let walkingToMentor = null, activeMentor = null, walkingToDoor = null;
+  const outsideInCity = () => state.inPlaza && !state.inHospital;
   const presence=createPresence();
   let hero, enemies, path = [], destination, clock = 0, previousFrame, manualUntil = 0, cooldown = 0, guard = 0,
       block = false, messages = [], effects = [], renderAt = 0, savedAt = 0, fightAt = 0, bossMode = false, hiddenSince = null;
@@ -83,16 +85,19 @@ export function createGame(world) {
       moving:hero.moving,running:hero.running
     }));
   }
-  function enter(zone, inPlaza=false) {
+  function enter(zone, inPlaza=false, inHospital=false, spawnOverride) {
     state.zone=zone;
     state.inPlaza=inPlaza;
-    if(!inPlaza) presence.stop();
-    const spawn=inPlaza ? {x:city.spawn.x+Math.floor(Math.random()*7)*8-24,y:city.spawn.y} : xy(nowMap().rally);
+    state.inHospital=inHospital;
+    if(!outsideInCity()) presence.stop();
+    const citySpawn={x:city.spawn.x+Math.floor(Math.random()*7)*8-24,y:city.spawn.y};
+    const spawn=spawnOverride ?? (inHospital ? hospital.spawn : inPlaza ? citySpawn : xy(nowMap().rally));
     hero={...spawn,hp:health(),facing:1,direction:'down',gaitTime:0,moving:false,rest:0};
     enemies=inPlaza ? [] : nowMap().spawns.map((p,i)=>foe(p,i));
     destination=null;
     path=[];
     walkingToMentor=null;
+    walkingToDoor=null;
     activeMentor=null;
     bossMode=false;
     block=false;
@@ -103,8 +108,8 @@ export function createGame(world) {
       const {x,y}=cellPoint(i);
       walkable[i]=Number(avoidWall(x,y));
     }
-    paintTerrain(state.zone,inPlaza);
-    if(inPlaza && !document.hidden) startPresence();
+    paintTerrain(state.zone,inPlaza,inHospital);
+    if(outsideInCity() && !document.hidden) startPresence();
   }
   function finish(enemy) {
     const m=nowMap();
@@ -139,12 +144,13 @@ export function createGame(world) {
     if (enemy.hp<=0) finish(enemy);
   }
   function avoidWall(x,y) {
+    if(state.inHospital) return hospitalWalkable(x,y);
     if(state.inPlaza) return cityWalkable(x,y);
     return x>=9 && x<=worldSize.width-9 && y>=12 && y<=worldSize.height-9 && !nowMap().walls.some(([l,t,w,h])=>x>l-6 && x<l+w+6 && y>t-4 && y<t+h+6);
   }
   function cellPoint(index) {
-    const offsetX=state.inPlaza ? city.x%cell : 0;
-    const offsetY=state.inPlaza ? city.y%cell : 0;
+    const offsetX=outsideInCity() ? city.x%cell : 0;
+    const offsetY=outsideInCity() ? city.y%cell : 0;
     return {x:index%nx*cell+cell/2+offsetX,y:Math.floor(index/nx)*cell+cell/2+offsetY};
   }
   function closestCell(point) {
@@ -214,7 +220,8 @@ export function createGame(world) {
   }
   function visitMentor(id) {
     const mentor=mentors.find(option=>option.id===id);
-    if(!state.inPlaza || activeMentor || !mentor) return;
+    if(!outsideInCity() || activeMentor || !mentor) return;
+    walkingToDoor=null;
     if(far(hero,mentor)<=28) return openMentor(mentor);
     walkingToMentor=mentor;
     setDestination({x:mentor.x,y:mentor.approachY});
@@ -322,6 +329,10 @@ export function createGame(world) {
       if (e.hp>0) moveEnemy(e,dt);
     });
     if (clock<hero.rest || activeMentor) return;
+    if(walkingToDoor && far(hero,walkingToDoor)<=12) {
+      useHospitalDoor();
+      return;
+    }
     if(walkingToMentor && far(hero,walkingToMentor)<=28) {
       openMentor(walkingToMentor);
       return;
@@ -332,6 +343,7 @@ export function createGame(world) {
       destination=null;
       path=[];
       walkingToMentor=null;
+      walkingToDoor=null;
       manualUntil=clock+1.4;
       hero.running=true;
       move(x*100,y*100,dt*101);
@@ -441,7 +453,7 @@ export function createGame(world) {
     const remaining = Math.max(0,Math.ceil(cooldown-clock));
     const danger = inDanger();
     snapshot = {
-      inPlaza:state.inPlaza, plazaStatus:presence.status, plazaName:presence.name,
+      inPlaza:state.inPlaza, inHospital:state.inHospital, plazaStatus:presence.status, plazaName:presence.name,
       plazaCount:presence.players.length+1,
       map, zone:state.zone, unlocked:state.unlocked, cleared:[...state.cleared],
       auto:state.auto, bossMode, bossReady:unlockedBoss(), trail:Math.min(state.kills[state.zone],map.goal),
@@ -459,7 +471,7 @@ export function createGame(world) {
     listeners.forEach(notify=>notify());
   }
   function openDistrict(index) {
-    if (!state.classId || !maps[index] || (!state.inPlaza && index === state.zone) || index > state.unlocked) return;
+    if (state.inHospital || !state.classId || !maps[index] || (!state.inPlaza && index === state.zone) || index > state.unlocked) return;
     enter(index);
     log('Patrulha em '+nowMap().name+'.');
     save();
@@ -469,6 +481,18 @@ export function createGame(world) {
     if(state.inPlaza) return;
     enter(state.zone,true);
     log('Você voltou à Praça Principal.');
+    save();
+    publish();
+  }
+  function useHospitalDoor() {
+    if(!state.inPlaza || activeMentor) return;
+    if(state.inHospital) {
+      enter(state.zone,true,false,hospital.entrance);
+      log('Você voltou à praça de Karakura.');
+    } else {
+      enter(state.zone,true,true);
+      log('Você entrou no Hospital de Karakura.');
+    }
     save();
     publish();
   }
@@ -527,14 +551,23 @@ export function createGame(world) {
   function pointAt(event) {
     const bounds=world.getBoundingClientRect();
     if(!bounds.width || !bounds.height) return;
-    const camera=(state.inPlaza ? cityCamera : cameraFor)(hero,world.width,world.height);
+    const camera=state.inHospital ? cameraFor(hospital.center,world.width,world.height)
+      : (outsideInCity() ? cityCamera : cameraFor)(hero,world.width,world.height);
     const point={
       x:camera.x+(event.clientX-bounds.left)*world.width/bounds.width,
       y:camera.y+(event.clientY-bounds.top)*world.height/bounds.height
     };
     if(state.inPlaza) {
       if(activeMentor) return;
-      const mentor=mentors.find(({x,y})=>Math.abs(x-point.x)<=37 && point.y>=y-50 && point.y<=y+12);
+      const door=state.inHospital ? hospital.exit : hospital.entrance;
+      if(Math.abs(point.x-door.x)<=29 && point.y>=door.y-32 && point.y<=door.y+14) {
+        walkingToMentor=null;
+        walkingToDoor=door;
+        setDestination(door);
+        return;
+      }
+      walkingToDoor=null;
+      const mentor=outsideInCity() &&mentors.find(({x,y})=>Math.abs(x-point.x)<=37 && point.y>=y-50 && point.y<=y+12);
       if(mentor) return visitMentor(mentor.id);
       walkingToMentor=null;
     }
@@ -550,6 +583,13 @@ export function createGame(world) {
   }
   function keydown(event) {
     const key=event.key.toLowerCase();
+    if(key==='e' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey &&
+        state.inPlaza && !activeMentor && event.target===world &&
+        far(hero,state.inHospital ? hospital.exit : hospital.entrance)<=27) {
+      event.preventDefault();
+      useHospitalDoor();
+      return;
+    }
     if (activeMentor || event.target.closest?.('dialog, input, select, textarea')) return;
     if (!movement.has(key) || event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
     if (key.startsWith('arrow') && event.target.closest?.('[role="tablist"]')) return;
@@ -567,7 +607,7 @@ export function createGame(world) {
       if(hiddenSince!==null) harvest((Date.now()-hiddenSince)/1000);
       hiddenSince=null;
       previousFrame=null;
-      if(state.inPlaza) startPresence();
+      if(outsideInCity()) startPresence();
       save();
       publish();
     }
@@ -577,13 +617,13 @@ export function createGame(world) {
     if(hiddenSince===null) save();
   }
   function pageshow() {
-    if(state.inPlaza && !document.hidden) startPresence();
+    if(outsideInCity() && !document.hidden) startPresence();
   }
   function frame(time) {
     if(!document.hidden) {
       simulate(Math.min(.055,Math.max(0,(time-(previousFrame??time))/1000)));
       draw({zone:state.zone,form:state.form,classId:state.classId,hero,enemies,destination,effects,clock,fightAt,
-        plazaView:state.inPlaza ? presence : null});
+        inHospital:state.inHospital, plazaView:outsideInCity() ? presence : null});
       if(Date.now()-savedAt>=3500) save();
       if(time>=renderAt) {
         renderAt=time+100;
@@ -594,8 +634,8 @@ export function createGame(world) {
     animationId=requestAnimationFrame(frame);
   }
   harvest((Date.now()-state.savedAt)/1000);
-  enter(state.zone,state.inPlaza ?? true);
-  log(state.inPlaza ? 'Você chegou à Praça Principal.' : 'Patrulha em '+nowMap().name+'.');
+  enter(state.zone,state.inPlaza ?? true,Boolean(state.inPlaza && state.inHospital));
+  log(state.inHospital ? 'Você está no Hospital de Karakura.' : state.inPlaza ? 'Você chegou à Praça Principal.' : 'Patrulha em '+nowMap().name+'.');
   save();
   publish();
   world.addEventListener('pointerdown',pointAt);
@@ -612,7 +652,7 @@ export function createGame(world) {
       listeners.add(notify);
       return ()=>listeners.delete(notify);
     },
-    visitMentor,closeMentor,chooseClass,addPoint,setGear,reinforce,openDistrict,openPlaza,toggleHunt,trackBoss,defend,useSkill,release,
+    useHospitalDoor,visitMentor,closeMentor,chooseClass,addPoint,setGear,reinforce,openDistrict,openPlaza,toggleHunt,trackBoss,defend,useSkill,release,
     dispose() {
       cancelAnimationFrame(animationId);
       world.removeEventListener('pointerdown',pointAt);

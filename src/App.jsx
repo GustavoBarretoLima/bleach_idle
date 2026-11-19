@@ -90,9 +90,10 @@ function Bag({ view, game }) {
 
 function Districts({ view, game }) {
   return <><h3>Escolha uma rota</h3>
-    {!view.classId && <small>Escolha uma classe na cidade para liberar a patrulha.</small>}
+    {view.inHospital && <small>Saia do hospital para iniciar uma patrulha.</small>}
+    {!view.inHospital && !view.classId && <small>Escolha uma classe na cidade para liberar a patrulha.</small>}
     {maps.map(({ name, area, lvl }, index) => <button key={name} className="region" aria-pressed={!view.inPlaza && index === view.zone}
-      disabled={!view.classId || view.unlocked < index} onClick={() => game.openDistrict(index)}>
+      disabled={view.inHospital || !view.classId || view.unlocked < index} onClick={() => game.openDistrict(index)}>
       <span><strong>{name}</strong><small>{area}</small></span>
       <small>{view.unlocked < index ? 'Bloqueado' : 'Nv. ' + lvl + (view.cleared[index] ? ' · Limpo' : '')}</small>
     </button>)}
@@ -223,19 +224,23 @@ function App() {
     {view?.offlineMessage && <p className="summary" role="status">{view.offlineMessage}</p>}
     <div className="grid"><div className="column">
       <section className="panel" aria-labelledby="place">
-        <div className="maphead"><div><h2 id="place">{view?.inPlaza || !view ? 'Karakura' : view.map.name}</h2>
-          {view && <small>{view.inPlaza ? 'Cidade inicial · Praça Principal' : view.map.area + ' · Níveis ' + view.map.lvl}</small>}</div>
+        <div className="maphead"><div><h2 id="place">{view?.inHospital ? 'Hospital de Karakura' : view?.inPlaza || !view ? 'Karakura' : view.map.name}</h2>
+          {view && <small>{view.inHospital ? 'Recepção e enfermaria' : view.inPlaza ? 'Cidade inicial · Praça Principal' : view.map.area + ' · Níveis ' + view.map.lvl}</small>}</div>
+          {view?.inPlaza && <button className="button hospital-door" onClick={game.useHospitalDoor}>
+            {view.inHospital ? 'Sair do hospital' : 'Entrar no hospital'}
+          </button>}
           {view && !view.inPlaza && <div className="patrol-nav">
             <span className="tag">{view.bossMode ? 'Encontro com chefe' : view.auto ? 'Caça automática' : 'Exploração livre'}</span>
             <button className="button plaza-return" onClick={game.openPlaza}>Voltar à praça</button>
           </div>}
         </div>
         <div className="viewport">
-          <canvas ref={world} width="544" height="306" tabIndex={0} aria-label={view?.inPlaza ? "Praça Principal. Use WASD para andar ou selecione um mentor na lista abaixo." : "Mapa de patrulha. Toque ou use WASD para andar."} />
+          <canvas ref={world} width="544" height="306" tabIndex={0} aria-label={view?.inHospital ? "Hospital de Karakura. Use WASD para andar ou toque na saída."
+            : view?.inPlaza ? "Praça Principal. Use WASD para andar, toque na porta do hospital ou selecione um mentor na lista." : "Mapa de patrulha. Toque ou use WASD para andar."} />
           <span className="risk" role="status" hidden={!view?.warning}>{view?.warning}</span>
-          <span className="worldnote">WASD ou toque para andar</span>
+          <span className="worldnote">{view?.inPlaza ? 'WASD ou toque · E na porta' : 'WASD ou toque para andar'}</span>
         </div>
-        {view && (view.inPlaza ? <PlazaControls view={view} game={game} /> : <PatrolControls view={view} game={game} />)}
+        {view && !view.inHospital && (view.inPlaza ? <PlazaControls view={view} game={game} /> : <PatrolControls view={view} game={game} />)}
       </section>
       {view && <section className="panel diary"><h2>Diário da patrulha</h2>
         <ul>{view.messages.map((message,index) => <li key={message + index}>{message}</li>)}</ul>

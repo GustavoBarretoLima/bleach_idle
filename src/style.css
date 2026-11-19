@@ -63,3 +63,6 @@
 .mentor-dialogue {margin:12px 0;line-height:1.55}
 .mentor-class {padding:9px 10px;margin-bottom:9px;background:#2b3538;border-radius:5px}
 .mentor-actions {display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:13px}
+
+.hospital-door {background:#274844;border-color:#4d7970;color:#def5ed;flex:none}
+@media(max-width:400px){.hospital-door{font-size:12px;padding-inline:7px}}
