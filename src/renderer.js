@@ -1,4 +1,4 @@
-import { maps, worldSize, cameraFor, plaza } from './data.js';
+import { maps, worldSize, cameraFor, plaza, classPaths, mentors } from './data.js';
 import { drawHeroPose } from './sprites.js';
 
 export function createRenderer(world, reducedMotion) {
@@ -143,6 +143,47 @@ export function createRenderer(world, reducedMotion) {
       tree(x,bottom+16,'#465e57');
     }
 
+    // Four landmarks frame the central pedestrian square.
+    for(const mentor of mentors) {
+      const {id,x,y}=mentor;
+      const color=classPaths[id].color;
+      const north=y<plaza.center.y;
+      const accent=north ? (id==='shinigami'?'#3f6655':'#495b78') : (id==='sado'?'#725956':'#496452');
+      const plotY=north ? y-49 : y-30;
+      ink(bg,'#403a3c',x-53,plotY,106,north?52:70);
+      ink(bg,accent,x-51,plotY+2,102,north?48:66);
+      for(let i=0;i<6;i++) {
+        ink(bg,'#e4d0a334',x-48,plotY+8+i*8,96,1);
+      }
+      if(north) {
+        building(x-52,y-87,104,58,id==='shinigami'?0:1,{roof:accent});
+        const signY=y-51;
+        ink(bg,'#2a2929',x-45,signY,90,13);
+        ink(bg,color,x-45,signY,90,1);
+        bg.fillStyle='#fff0d7';
+        bg.font='bold 9px monospace';
+        bg.textAlign='center';
+        bg.fillText(mentor.place,x,signY+10);
+      } else if(id==='sado') {
+        ink(bg,'#bfa48b80',x-42,plotY+8,84,1);
+        ink(bg,'#bfa48b80',x-42,plotY+53,84,1);
+        for(const offset of [-38,38]) {
+          ink(bg,'#312b2f',x+offset-4,y-16,8,27);
+          ink(bg,'#a98064',x+offset-3,y-16,6,18);
+          ink(bg,'#cfab81',x+offset-3,y-13,6,2);
+        }
+      } else {
+        for(const offset of [-38,38]) {
+          ellipse(bg,'#273a32',x+offset,y-5,11,16);
+          for(let i=0;i<9;i++) {
+            ink(bg,i%2 ? '#d38895' : '#ffc4b9',x+offset-8+dice(i+offset)*15,y-17+i*2,3,2);
+          }
+        }
+      }
+      ellipse(bg,color+'58',x,y+2,19,8);
+      ellipse(bg,accent,x,y+1,16,6);
+    }
+
     ellipse(bg,'#26363d80',(fx+fr)/2,fb+3,43,9);
     ink(bg,'#282c38',fx,fy,fr-fx,fb-fy);
     ink(bg,'#a39279',fx+3,fy+3,fr-fx-6,fb-fy-8);
@@ -180,10 +221,73 @@ export function createRenderer(world, reducedMotion) {
     bg.lineWidth=4;
     bg.strokeRect(0,0,worldSize.width,worldSize.height);
   }
-  function character(x,y,actor,form,clock,fightAt) {
+  const outfits = {
+    human: {hair:'#303447', cloth:'#687383', trim:'#c5c9d2'},
+    shinigami: {hair:'#d6c29c', cloth:'#405f4f', trim:'#9dd4a0'},
+    quincy: {hair:'#dad9e5', cloth:'#e5e6f2', trim:'#5a8ac7'},
+    sado: {hair:'#30292f', cloth:'#886450', trim:'#e4916e', skin:'#bd8367'},
+    inoue: {hair:'#c98850', cloth:'#8d627e', trim:'#ffc5a2'}
+  };
+  function civilian(actor, clock, fightAt, mentor) {
+    const id=actor.classId??'human';
+    const {hair,cloth,trim,skin='#e7b398'}=outfits[id]??outfits.human;
+    const step=actor.moving&&!reducedMotion.matches ? Math.floor(actor.gaitTime*10)%2*2 : 0;
+    const back=actor.direction==='up';
+    const side=actor.direction==='left'||actor.direction==='right';
+    if(side && actor.facing===-1) ctx.scale(-1,1);
+    ink(ctx,'#262332',-6,-7,5,7-step);
+    ink(ctx,'#262332',1,-7,5,5+step);
+    ink(ctx,'#242632',-9,-19,18,12);
+    ink(ctx,cloth,-7,-19,14,11);
+    ink(ctx,trim,-6,-11,12,2);
+    ink(ctx,trim,-7,-17,3,4);
+    ink(ctx,hair,-7,-33,14,15);
+    if(!back) {
+      ink(ctx,skin,side?-2:-5,-28,side?8:10,9);
+      ink(ctx,'#302833',side?4:-4,-25,2,1);
+      if(!side) ink(ctx,'#302833',2,-25,2,1);
+    }
+    if(mentor && id==='shinigami') {
+      ink(ctx,'#21332f',-10,-33,20,5);
+      ink(ctx,'#68977a',-7,-38,14,6);
+      ink(ctx,'#e1dfc4',-6,-36,12,2);
+      ink(ctx,'#d5c99e',9,-19,2,20);
+    }
+    if(mentor && id==='quincy') ink(ctx,'#d8effd',-5,-26,10,2);
+    if(id==='sado') {
+      ink(ctx,'#553f5b',6,-18,6,13);
+      ink(ctx,trim,8,-16,3,8);
+    }
+    if(id==='inoue') ink(ctx,'#fff1a8',5,-30,3,3);
+    if(id==='quincy' && !mentor) {
+      ctx.strokeStyle='#99dcff';
+      ctx.lineWidth=1.5;
+      ctx.beginPath();
+      ctx.arc(8,-14,8,-1.25,1.25);
+      ctx.stroke();
+    }
+    if(!reducedMotion.matches && fightAt>0 && clock-fightAt<.23) {
+      const color=classPaths[id]?.color??'#fff0d7';
+      const dx=actor.direction==='up'||actor.direction==='down'?0:1;
+      const dy=actor.direction==='up'?-1:actor.direction==='down'?1:0;
+      const reach=id==='quincy'?38:17;
+      ctx.strokeStyle=color;
+      ctx.lineWidth=2;
+      ctx.beginPath();
+      ctx.moveTo(dx*7,-14+dy*7);
+      ctx.lineTo(dx*reach,-14+dy*reach);
+      ctx.stroke();
+    }
+  }
+  function character(x,y,actor,form,clock,fightAt,mentor=false) {
     const step=actor.moving&&!reducedMotion.matches ? Math.floor(clock*12)%2 : 0;
     ctx.save();ctx.translate(Math.round(x),Math.round(y));
     ellipse(ctx,'#171a1bc2',0,2,11,4);
+    if(mentor || actor.classId !== 'shinigami') {
+      civilian(actor,clock,fightAt,mentor);
+      ctx.restore();
+      return;
+    }
     if(form) ellipse(ctx,form===2?'#ecaed04c':'#a69ae451',0,-9,13,15);
     if (drawHeroPose(ctx,actor,form,clock,fightAt,reducedMotion.matches)) {
       ctx.restore();
@@ -303,7 +407,7 @@ export function createRenderer(world, reducedMotion) {
   }
   const remotePlayers=new Map();
   let lastDraw=0;
-  function drawPlaza(hero,form,online,clock) {
+  function drawPlaza(hero,form,classId,online,clock) {
     const both=[...online.players];
     const present=new Set(both.map(player=>player.id));
     for(const id of remotePlayers.keys()) if(!present.has(id)) remotePlayers.delete(id);
@@ -326,11 +430,13 @@ export function createRenderer(world, reducedMotion) {
       actor.facing=player.direction==='left' ? -1 : 1;
       actor.name=player.name;
       actor.form=player.form;
+      actor.classId=player.classId===undefined ? 'shinigami' : player.classId;
       remotePlayers.set(player.id,actor);
     }
-    const self={...hero,name:online.name??'Você',form};
-    for(const actor of [...remotePlayers.values(),self].sort((a,b)=>a.y-b.y)) {
-      character(actor.x,actor.y,actor,actor.form,clock,0);
+    const self={...hero,name:online.name??'Você',form,classId};
+    const guides=mentors.map(mentor=>({...mentor,name:mentor.label,classId:mentor.id,mentor:true,direction:'down',facing:1}));
+    for(const actor of [...remotePlayers.values(),self,...guides].sort((a,b)=>a.y-b.y)) {
+      character(actor.x,actor.y,actor,actor.form,clock,0,actor.mentor);
       ctx.font='bold 10px monospace';
       ctx.textAlign='center';
       const labelWidth=ctx.measureText(actor.name).width;
@@ -340,11 +446,11 @@ export function createRenderer(world, reducedMotion) {
         ctx.fillRect(x-2,y-17,4,3);
       }
       ink(ctx,'#141c24e0',x-labelWidth/2-3,y-10,labelWidth+6,13);
-      ctx.fillStyle=actor===self?'#ffe1a1':'#a4f0df';
+      ctx.fillStyle=actor.mentor ? classPaths[actor.classId].color : actor===self ? '#ffe1a1' : '#a4f0df';
       ctx.fillText(actor.name,x,y);
     }
   }
-  function draw({zone,form,hero,enemies,destination,effects,clock,fightAt,plazaView}) {
+  function draw({zone,form,classId,hero,enemies,destination,effects,clock,fightAt,plazaView}) {
     const camera=cameraFor(plazaView?plaza.center:hero,width,height);
     ctx.drawImage(background,camera.x,camera.y,width,height,0,0,width,height);
     ctx.save();
@@ -354,7 +460,7 @@ export function createRenderer(world, reducedMotion) {
       ellipse(ctx,'#233629',destination.x,destination.y,4,2);
     }
     if(plazaView) {
-      drawPlaza(hero,form,plazaView,clock);
+      drawPlaza(hero,form,classId,plazaView,clock);
       lastDraw=clock;
       ctx.restore();
       return;
@@ -364,7 +470,7 @@ export function createRenderer(world, reducedMotion) {
     const living=enemies.filter(e=>e.hp>0 && e.x>=camera.x-42 && e.x<=camera.x+width+42 &&
       e.y>=camera.y-45 && e.y<=camera.y+height+75);
     for(const actor of [...living,hero].sort((a,b)=>a.y-b.y)) {
-      if(actor===hero) character(hero.x,hero.y,hero,form,clock,fightAt);
+      if(actor===hero) character(hero.x,hero.y,{...hero,classId},form,clock,fightAt);
       else monster(actor,zone,clock,hero);
     }
     const targetEnemy=destination?.max && destination.hp>0 ? destination : null;

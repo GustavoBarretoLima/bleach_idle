@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createGame } from './game.js';
-import { maps } from './data.js';
+import { classPaths, maps, mentors } from './data.js';
 import './style.css';
 
 const fmt = new Intl.NumberFormat('pt-BR');
@@ -48,9 +48,9 @@ function Build({ view, game }) {
     <div className="row"><div><strong>Vitalidade {view.vit}</strong><small>+14 PV por ponto</small></div>
       <button className="button plus" aria-label="Aumentar vitalidade" disabled={!view.points} onClick={() => game.addPoint('vit')}>+</button>
     </div>
-    <div className="row"><div><strong>Liberação</strong><small>{view.formHint}</small></div>
+    {view.form && <div className="row"><div><strong>Liberação</strong><small>{view.formHint}</small></div>
       <button className="button skill" disabled={!view.releaseReady} onClick={game.release}>{view.nextForm}</button>
-    </div>
+    </div>}
   </>;
 }
 
@@ -90,8 +90,9 @@ function Bag({ view, game }) {
 
 function Districts({ view, game }) {
   return <><h3>Escolha uma rota</h3>
+    {!view.classId && <small>Escolha uma classe na cidade para liberar a patrulha.</small>}
     {maps.map(({ name, area, lvl }, index) => <button key={name} className="region" aria-pressed={!view.inPlaza && index === view.zone}
-      disabled={view.unlocked < index} onClick={() => game.openDistrict(index)}>
+      disabled={!view.classId || view.unlocked < index} onClick={() => game.openDistrict(index)}>
       <span><strong>{name}</strong><small>{area}</small></span>
       <small>{view.unlocked < index ? 'Bloqueado' : 'Nv. ' + lvl + (view.cleared[index] ? ' · Limpo' : '')}</small>
     </button>)}
@@ -113,8 +114,8 @@ function CharacterPanel({ view, game }) {
   }
   return <aside className="side">
     <section className="panel profile">
-      <div className="profileTop"><span className="portrait" aria-hidden="true">斬</span>
-        <div><h2>Ren Amagiri</h2><small>Shinigami · Nível {view.level} · {view.form}</small></div>
+      <div className="profileTop"><span className="portrait" style={{color:view.classInfo?.color}} aria-hidden="true">{view.classInfo?.icon ?? '人'}</span>
+        <div><h2>Ren Amagiri</h2><small>{view.classInfo?.name ?? 'Humano'} · Nível {view.level}{view.form && ' · '+view.form}</small></div>
       </div>
       <div className="stats"><div className="stat">Ataque <b>{fmt.format(view.attack)}</b></div>
         <div className="stat">PV máx. <b>{fmt.format(view.maxHp)}</b></div>
@@ -135,11 +136,58 @@ function CharacterPanel({ view, game }) {
   </aside>;
 }
 
+function MentorDialog({ mentor, currentClass, game }) {
+  const dialog = useRef(null);
+  useEffect(() => {
+    const modal = dialog.current;
+    modal.showModal();
+    return () => modal.close();
+  }, []);
+  const option=classPaths[mentor.id];
+  return <dialog ref={dialog} className="mentor-dialog" aria-labelledby="mentor-name" onCancel={event=>{
+    event.preventDefault();
+    game.closeMentor();
+  }}>
+    <header>
+      <small style={{color:option.color}}>{mentor.place}</small>
+      <h2 id="mentor-name">{mentor.name}</h2>
+    </header>
+    <p className="mentor-dialogue">{mentor.dialogue}</p>
+    <div className="mentor-class"><strong>{option.name}</strong><p>{option.style}</p></div>
+    <p className="mentor-choice-info">{currentClass ? 'Sua classe atual é '+currentClass.name+'.' : 'A escolha de classe é definitiva para este personagem.'}</p>
+    <div className="mentor-actions">
+      <button autoFocus type="button" className="button" onClick={game.closeMentor}>Fechar</button>
+      {!currentClass && <button type="button" className="button on" onClick={()=>game.chooseClass(mentor.id)}>Virar {option.name}</button>}
+    </div>
+  </dialog>;
+}
+
+function MentorDirectory({ view, game }) {
+  const walking=mentors.find(mentor=>mentor.id===view.walkingToMentor);
+  return <section className="mentor-directory" aria-labelledby="mentors-title">
+    <div className="mentor-heading">
+      <h3 id="mentors-title">Mentores de Karakura</h3>
+      <p role="status">{walking ? 'Indo falar com '+walking.label+'…' : view.classId ? 'Visite os mentores pela praça.' : 'Converse com um mentor para escolher sua classe.'}</p>
+    </div>
+    <div className="mentor-list">
+      {mentors.map(({id,label,place})=>{
+        const option=classPaths[id];
+        return <button key={id} type="button" className="mentor-card" style={{'--mentor-color':option.color}}
+          aria-label={'Visitar '+label+' · '+option.name} onClick={()=>game.visitMentor(id)}>
+          <span className="mentor-icon" aria-hidden="true">{option.icon}</span>
+          <span><strong>{label} {label!==option.name && <small>· {option.name}</small>}</strong><small>{place}</small></span>
+        </button>;
+      })}
+    </div>
+    {view.activeMentor && <MentorDialog mentor={view.activeMentor} currentClass={view.classInfo} game={game} />}
+  </section>;
+}
+
 function PlazaControls({ view, game }) {
   const online=view.plazaStatus==='online';
   const label=online ? (view.plazaCount===1 ? '1 jogador na praça' : view.plazaCount+' jogadores na praça')
     : view.plazaStatus==='connecting' ? 'Conectando à praça…' : 'Conexão indisponível. Reconectando…';
-  return <div className="plaza-controls">
+  return <><MentorDirectory view={view} game={game} /><div className="plaza-controls">
     <div className="plaza-presence">
       <p role="status" className={online ? 'green' : undefined}>{label}</p>
       {online && <small>{view.plazaName} · Você</small>}
@@ -148,12 +196,12 @@ function PlazaControls({ view, game }) {
       event.preventDefault();
       game.openDistrict(Number(new FormData(event.currentTarget).get('district')));
     }}>
-      <select aria-label="Distrito de patrulha" name="district" defaultValue={view.zone}>
+      <select aria-label="Distrito de patrulha" name="district" defaultValue={view.zone} disabled={!view.classId}>
         {maps.slice(0,view.unlocked+1).map(({name},index)=><option key={name} value={index}>{name}</option>)}
       </select>
-      <button type="submit" className="button on">Patrulhar</button>
+      <button type="submit" className="button on" disabled={!view.classId}>Patrulhar</button>
     </form>
-  </div>;
+  </div></>;
 }
 
 function App() {
@@ -175,15 +223,15 @@ function App() {
     {view?.offlineMessage && <p className="summary" role="status">{view.offlineMessage}</p>}
     <div className="grid"><div className="column">
       <section className="panel" aria-labelledby="place">
-        <div className="maphead"><div><h2 id="place">{view?.inPlaza || !view ? 'Praça Principal' : view.map.name}</h2>
-          {view && <small>{view.inPlaza ? 'Karakura' : view.map.area + ' · Níveis ' + view.map.lvl}</small>}</div>
+        <div className="maphead"><div><h2 id="place">{view?.inPlaza || !view ? 'Karakura' : view.map.name}</h2>
+          {view && <small>{view.inPlaza ? 'Cidade inicial · Praça Principal' : view.map.area + ' · Níveis ' + view.map.lvl}</small>}</div>
           {view && !view.inPlaza && <div className="patrol-nav">
             <span className="tag">{view.bossMode ? 'Encontro com chefe' : view.auto ? 'Caça automática' : 'Exploração livre'}</span>
             <button className="button plaza-return" onClick={game.openPlaza}>Voltar à praça</button>
           </div>}
         </div>
         <div className="viewport">
-          <canvas ref={world} width="544" height="306" tabIndex={0} aria-label={view?.inPlaza ? "Praça Principal. Toque ou use WASD para andar." : "Mapa de patrulha. Toque ou use WASD para andar."} />
+          <canvas ref={world} width="544" height="306" tabIndex={0} aria-label={view?.inPlaza ? "Praça Principal. Use WASD para andar ou selecione um mentor na lista abaixo." : "Mapa de patrulha. Toque ou use WASD para andar."} />
           <span className="risk" role="status" hidden={!view?.warning}>{view?.warning}</span>
           <span className="worldnote">WASD ou toque para andar</span>
         </div>

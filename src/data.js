@@ -6,9 +6,28 @@ export const plaza = {
   spawnY:388
 };
 
+export const classPaths = {
+  shinigami: {name:'Shinigami', icon:'斬', color:'#a2e2a9', skill:'Corte espiritual', style:'Espada e evolução para Shikai e Bankai.', range:27, power:2.2},
+  quincy: {name:'Quincy', icon:'弓', color:'#9bd9ff', skill:'Flecha espiritual', style:'Disparos de Reishi com maior alcance.', range:76, power:1.9},
+  sado: {name:'Sado', icon:'拳', color:'#ffbc8b', skill:'Impacto do Gigante', style:'Combate corpo a corpo, mais PV e golpe pesado.', range:27, power:2.6, bonusHp:18},
+  inoue: {name:'Inoue', icon:'盾', color:'#ffd295', skill:'Escudo Restaurador', style:'Técnica espiritual que causa dano e recupera PV.', range:38, power:1.7, recovery:.18}
+};
+
+export const mentors = [
+  {id:'shinigami', name:'Kisuke Urahara', label:'Urahara', place:'Loja Urahara', x:386, y:266, approachY:288,
+    dialogue:'Se consegue sentir a pressão espiritual da cidade, já tem por onde começar. Passe na minha loja e vamos despertar sua lâmina.'},
+  {id:'quincy', name:'Ryūken Ishida', label:'Ryūken', place:'Clínica Ishida', x:734, y:266, approachY:288,
+    dialogue:'Uma flecha Quincy começa pela concentração. Posso ensinar você a reunir o Reishi ao seu redor e dar forma a ele.'},
+  {id:'sado', name:'Yasutora “Chad” Sado', label:'Sado', place:'Pátio de Treino', x:386, y:387, approachY:410,
+    dialogue:'Força vale mais quando você tem alguém para proteger. Se quiser treinar comigo, começamos por aí.'},
+  {id:'inoue', name:'Orihime Inoue', label:'Inoue', place:'Jardim de Karakura', x:734, y:387, approachY:410,
+    dialogue:'Quando alguém se machuca, eu penso em como posso ajudar. Posso mostrar como meu escudo protege e recupera.'}
+];
+
 export function plazaWalkable(x,y) {
   const {bounds,fountain}=plaza;
   return x>=bounds.left && x<=bounds.right && y>=bounds.top && y<=bounds.bottom &&
+    !mentors.some(mentor=>mentor.y<plaza.center.y && Math.abs(x-mentor.x)<57 && y<mentor.y-25) &&
     !(x>fountain.left-4 && x<fountain.right+4 && y>fountain.top-4 && y<fountain.bottom+4);
 }
 
@@ -48,4 +67,4 @@ export const drops = [['steel','coat'],['moon','silk'],['dusk','veil']];
 export const forms = ['Selada','Shikai','Bankai'];
 export const powers = ['Corte espiritual','Lua Partida','Eclipse da Vigília'];
 export const key = 'bleach-idle-vigilia-v1';
-export const initial = () => ({version:2, level:1,xp:0,reishi:18,str:0,vit:0,points:0,legacyBlade:0,legacyArmor:0,form:0,zone:0,unlocked:0,kills:[0,0,0],cleared:[false,false,false],auto:true,bag:[],gear:{blade:null,armor:null},upgrades:{},savedAt:Date.now()});
+export const initial = () => ({version:3, classId:null, inPlaza:true, level:1,xp:0,reishi:18,str:0,vit:0,points:0,legacyBlade:0,legacyArmor:0,form:0,zone:0,unlocked:0,kills:[0,0,0],cleared:[false,false,false],auto:true,bag:[],gear:{blade:null,armor:null},upgrades:{},savedAt:Date.now()});
