@@ -193,14 +193,15 @@ export function createRenderer(world, reducedMotion) {
     ink(ctx,'#e8d5bd',-2,-19,1,1);
     ink(ctx,'#e8d5bd',1,-19,1,1);
   }
-  function monster(enemy,zone,clock) {
+  function monster(enemy,zone,clock,hero) {
     const {x,y,boss,demi,hp,max}=enemy;
     if(hp<=0) return;
     if(enemy.charge) {
       ellipse(ctx,'#eb725b6f',x,y,33,20);
       ellipse(ctx,'#ee9b7652',x,y,24,14);
     }
-    const phase=Math.sin(clock*4+enemy.index);
+    if(enemy.strikeAt) ellipse(ctx,'#eb725b6f',x,y,19,9);
+    const phase=Math.sin(clock*(enemy.alert?8:5)+enemy.index);
     const sway=reducedMotion.matches ? 0 : Math.round(phase*2);
     const hover=demi ? 4+sway : zone===2 ? 2+sway : Math.max(0,sway);
     const flash=enemy.hitAt>0 && clock-enemy.hitAt<.13;
@@ -208,7 +209,10 @@ export function createRenderer(world, reducedMotion) {
     ctx.translate(Math.round(x),Math.round(y));
     ctx.scale(boss?1.45:1,boss?1.45:1);
     ellipse(ctx,'#151821b0',0,1,demi?8:14,4);
-    ctx.translate(0,-hover);
+    const attackAge=clock-enemy.attackAt;
+    const lunge=(!reducedMotion.matches && attackAge<.22) ? Math.sin(attackAge/.22*Math.PI)*5 : 0;
+    const bearing=Math.atan2(hero.y-y,hero.x-x);
+    ctx.translate(Math.round(Math.cos(bearing)*lunge),Math.round(Math.sin(bearing)*lunge)-hover);
     if(demi) demiHollow(sway,flash);
     else fullHollow(zone,boss,sway,flash);
     const barY=boss?-42:-39;
@@ -225,7 +229,7 @@ export function createRenderer(world, reducedMotion) {
     const living=enemies.filter(e=>e.hp>0);
     for(const actor of [...living,hero].sort((a,b)=>a.y-b.y)) {
       if(actor===hero) character(hero.x,hero.y,hero,form,clock,fightAt);
-      else monster(actor,zone,clock);
+      else monster(actor,zone,clock,hero);
     }
     const targetEnemy=destination?.max && destination.hp>0 ? destination : null;
     if(targetEnemy) {
