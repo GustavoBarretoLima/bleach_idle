@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { createGame } from './game.js';
 import { classPaths, maps, mentors } from './data.js';
 import './style.css';
+const locationTitles={city:'Karakura',hospital:'Hospital de Karakura',shop:'Loja Urahara',training:'Câmara subterrânea'};
+const locationDetails={city:'Cidade inicial · Praça Principal',hospital:'Recepção e enfermaria',shop:'Doces, tatami e artigos espirituais',training:'Área secreta de treinamento · Sob a Loja Urahara'};
 
 const fmt = new Intl.NumberFormat('pt-BR');
 const getEmptySnapshot = () => null;
@@ -90,10 +92,10 @@ function Bag({ view, game }) {
 
 function Districts({ view, game }) {
   return <><h3>Escolha uma rota</h3>
-    {view.inHospital && <small>Saia do hospital para iniciar uma patrulha.</small>}
+    {view.inPlaza && view.location!=='city' && <small>Volte a Karakura para iniciar uma patrulha.</small>}
     {!view.inHospital && !view.classId && <small>Escolha uma classe na cidade para liberar a patrulha.</small>}
     {maps.map(({ name, area, lvl }, index) => <button key={name} className="region" aria-pressed={!view.inPlaza && index === view.zone}
-      disabled={view.inHospital || !view.classId || view.unlocked < index} onClick={() => game.openDistrict(index)}>
+      disabled={(view.inPlaza && view.location!=='city') || !view.classId || view.unlocked < index} onClick={() => game.openDistrict(index)}>
       <span><strong>{name}</strong><small>{area}</small></span>
       <small>{view.unlocked < index ? 'Bloqueado' : 'Nv. ' + lvl + (view.cleared[index] ? ' · Limpo' : '')}</small>
     </button>)}
@@ -168,12 +170,12 @@ function MentorDialog({ mentor, view, game }) {
 }
 
 function MentorDirectory({ view, game }) {
-  const available=mentors.filter(mentor=>Boolean(mentor.hospital)===view.inHospital);
+  const available=mentors.filter(mentor=>(mentor.room ?? (mentor.hospital ? 'hospital' : 'city'))===view.location);
   const walking=available.find(mentor=>mentor.id===view.walkingToMentor);
   return <section className="mentor-directory" aria-labelledby="mentors-title">
     <div className="mentor-heading">
-      <h3 id="mentors-title">{view.inHospital ? 'Mentores do hospital' : 'Mentores de Karakura'}</h3>
-      <p role="status">{walking ? 'Indo falar com '+walking.label+'…' : view.inHospital ? (view.classId ? 'Inoue pode recuperar seus PV.' : 'Converse com um mentor para escolher sua classe.') : 'Inoue, Sado e Ryūken estão no hospital.'}</p>
+      <h3 id="mentors-title">{view.location==='training' ? 'Câmara de treinamento' : view.location==='shop' ? 'Kisuke Urahara' : view.inHospital ? 'Mentores do hospital' : 'Mentores de Karakura'}</h3>
+      <p role="status">{walking ? 'Indo falar com '+walking.label+'…' : view.inHospital ? (view.classId ? 'Inoue pode recuperar seus PV.' : 'Converse com um mentor para escolher sua classe.') : view.location==='shop' ? 'Converse com Urahara ou explore a passagem subterrânea.' : view.location==='training' ? 'Explore a câmara. Use a escada para voltar à loja.' : 'Urahara está na loja. Inoue, Sado e Ryūken estão no hospital.'}</p>
     </div>
     <div className="mentor-list">
       {available.map(({id,label,place})=>{
@@ -229,23 +231,20 @@ function App() {
     {view?.offlineMessage && <p className="summary" role="status">{view.offlineMessage}</p>}
     <div className="grid"><div className="column">
       <section className="panel" aria-labelledby="place">
-        <div className="maphead"><div><h2 id="place">{view?.inHospital ? 'Hospital de Karakura' : view?.inPlaza || !view ? 'Karakura' : view.map.name}</h2>
-          {view && <small>{view.inHospital ? 'Recepção e enfermaria' : view.inPlaza ? 'Cidade inicial · Praça Principal' : view.map.area + ' · Níveis ' + view.map.lvl}</small>}</div>
-          {view?.inPlaza && <button className="button hospital-door" onClick={game.useHospitalDoor}>
-            {view.inHospital ? 'Sair do hospital' : 'Entrar no hospital'}
-          </button>}
+        <div className="maphead"><div><h2 id="place">{view?.inPlaza ? locationTitles[view.location] : view ? view.map.name : 'Karakura'}</h2>
+          {view && <small>{view.inPlaza ? locationDetails[view.location] : view.map.area + ' · Níveis ' + view.map.lvl}</small>}</div>
+          {view?.inPlaza && <div className="location-doors">{view.doors.map(door=><button key={door.id} className="button" onClick={()=>game.visitDoor(door.id)}>{door.label}</button>)}</div>}
           {view && !view.inPlaza && <div className="patrol-nav">
             <span className="tag">{view.bossMode ? 'Encontro com chefe' : view.auto ? 'Caça automática' : 'Exploração livre'}</span>
             <button className="button plaza-return" onClick={game.openPlaza}>Voltar à praça</button>
           </div>}
         </div>
         <div className="viewport">
-          <canvas ref={world} width="544" height="306" tabIndex={0} aria-label={view?.inHospital ? "Hospital de Karakura. Use WASD para andar, toque na saída ou selecione um mentor na lista."
-            : view?.inPlaza ? "Praça Principal. Use WASD para andar, toque na porta do hospital ou selecione um mentor na lista." : "Mapa de patrulha. Toque ou use WASD para andar."} />
+          <canvas ref={world} width="544" height="306" tabIndex={0} aria-label={view?.inPlaza ? `${locationTitles[view.location]}. Use WASD para andar. Toque numa porta ou escada, ou pressione E perto dela para atravessar.` : 'Mapa de patrulha. Toque ou use WASD para andar.'} />
           <span className="risk" role="status" hidden={!view?.warning}>{view?.warning}</span>
-          <span className="worldnote">{view?.inPlaza ? 'WASD ou toque · E na porta' : 'WASD ou toque para andar'}</span>
+          <span className="worldnote">{view?.inPlaza ? 'WASD ou toque · E na porta ou escada' : 'WASD ou toque para andar'}</span>
         </div>
-        {view && (view.inHospital ? <MentorDirectory view={view} game={game} />
+        {view && (view.inPlaza && view.location!=='city' ? <MentorDirectory view={view} game={game} />
           : view.inPlaza ? <PlazaControls view={view} game={game} /> : <PatrolControls view={view} game={game} />)}
       </section>
       {view && <section className="panel diary"><h2>Diário da patrulha</h2>

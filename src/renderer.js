@@ -1,24 +1,23 @@
 import { maps, worldSize, cameraFor, classPaths, mentors } from './data.js';
 import { drawHeroPose } from './sprites.js';
-import { city, cityCamera, cityProps, decodeCityPosition } from './city.js';
-import groundUrl from './karakura/ground.webp';
-import propsUrl from './karakura/props.webp';
+import { city, cityCamera, decodeCityPosition } from './city.js';
+import { paintKarakura } from './karakura/world.js';
 import mentorsUrl from './karakura/mentors.png';
 import bedUrl from './karakura/hospital-bed.png';
 import { hospital } from './hospital.js';
+import { shop, paintUrahara } from './urahara.js';
 
 const loadTexture = url => {
   const image = new Image();
   image.src = url;
   return image;
 };
-const cityGround=loadTexture(groundUrl);
-const propAtlas=loadTexture(propsUrl);
+
 const mentorAtlas=loadTexture(mentorsUrl);
 const bedSprite=loadTexture(bedUrl);
 const mentorFrames={shinigami:0,sado:1,inoue:2,quincy:3};
 const mentorActors=mentors.map(mentor=>({...mentor,name:mentor.label,classId:mentor.id,mentor:true,direction:'down',facing:1}));
-const plazaMentors=mentorActors.filter(mentor=>!mentor.hospital);
+const plazaMentors=mentorActors.filter(mentor=>!mentor.hospital && !mentor.room);
 const hospitalMentors=mentorActors.filter(mentor=>mentor.hospital);
 
 export function createRenderer(world, reducedMotion) {
@@ -211,12 +210,13 @@ export function createRenderer(world, reducedMotion) {
     ink(bg,'#b3d4c7',exit.x-16,exit.y-3,32,2);
     hospitalLabel(bg,'SAÍDA',exit.x,exit.y-14);
   }
-  function paintTerrain(zone, inPlaza, inHospital) {
+  function paintTerrain(zone, inPlaza, inHospital, uraharaRoom) {
+    if(uraharaRoom) { paintUrahara(bg,uraharaRoom); return; }
     if(inHospital) {
       paintHospital();
       return;
     }
-    if(inPlaza) return;
+    if(inPlaza) { paintKarakura(bg); return; }
     const map=maps[zone];
     ink(bg,map.ground,0,0,worldSize.width,worldSize.height);
     if(map.arena) paintArena(map);
@@ -454,12 +454,7 @@ export function createRenderer(world, reducedMotion) {
     }
     const self={...hero,name:online.name??'Você',form,classId};
     const actors=[...remotePlayers.values(),self,...plazaMentors];
-    for(const actor of [...cityProps,...actors].sort((a,b)=>(a.sortY??a.y)-(b.sortY??b.y))) {
-      if(actor.region) {
-        const [u,v,w,h]=actor.region;
-        if(propAtlas.naturalWidth) ctx.drawImage(propAtlas,u,v,w,h,actor.x,actor.y,w,h);
-        continue;
-      }
+    for(const actor of actors.sort((a,b)=>a.y-b.y)) {
       drawNamedActor(actor,clock,actor===self);
     }
   }
@@ -477,16 +472,12 @@ export function createRenderer(world, reducedMotion) {
     ctx.fillStyle=actor.mentor ? classPaths[actor.classId].color : isSelf ? '#ffe1a1' : '#a4f0df';
     ctx.fillText(actor.name,x,y);
   }
-  function draw({zone,form,classId,hero,enemies,destination,effects,clock,fightAt,inHospital,plazaView}) {
-    const camera=inHospital ? cameraFor(hospital.center,width,height)
+  function draw({zone,form,classId,hero,enemies,destination,effects,clock,fightAt,inHospital,uraharaRoom,plazaView}) {
+    const camera=uraharaRoom==='shop' ? cameraFor(shop.center,width,height) : inHospital ? cameraFor(hospital.center,width,height)
       : (plazaView ? cityCamera : cameraFor)(hero,width,height);
-    if(!plazaView) ctx.drawImage(background,camera.x,camera.y,width,height,0,0,width,height);
-    else ink(ctx,'#30383b',0,0,width,height);
+    ctx.drawImage(background,camera.x,camera.y,width,height,0,0,width,height);
     ctx.save();
     ctx.translate(-camera.x,-camera.y);
-    if(plazaView && cityGround.naturalWidth) {
-      ctx.drawImage(cityGround,city.x,city.y,city.width,city.height);
-    }
     if(destination && !destination.max) {
       ellipse(ctx,'#d9e5ce75',destination.x,destination.y,7,4);
       ellipse(ctx,'#233629',destination.x,destination.y,4,2);
@@ -494,12 +485,21 @@ export function createRenderer(world, reducedMotion) {
     if(plazaView) {
       drawPlaza(hero,form,classId,plazaView,clock);
       hospitalLabel(ctx,'HOSPITAL',hospital.entrance.x,hospital.entrance.y-32,'#adf4d7');
+      hospitalLabel(ctx,'LOJA URAHARA',shop.entrance.x,shop.entrance.y-17,'#f1d9a1');
       lastDraw=clock;
       ctx.restore();
       return;
     }
     lastDraw=clock;
     remotePlayers.clear();
+    if(uraharaRoom) {
+      for(const actor of [...mentorActors.filter(m=>m.room===uraharaRoom),hero].sort((a,b)=>a.y-b.y)) {
+        if(actor===hero) character(hero.x,hero.y,{...hero,classId},form,clock,0);
+        else drawNamedActor(actor,clock);
+      }
+      ctx.restore();
+      return;
+    }
     if(inHospital) {
       if(bedSprite.naturalWidth) {
         for(const {x,y,width,height} of hospital.beds) ctx.drawImage(bedSprite,x,y,width,height);

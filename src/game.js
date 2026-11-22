@@ -2,6 +2,7 @@ import { createRenderer } from './renderer.js';
 import { createPresence } from './presence.js';
 import { city, cityCamera, cityWalkable, encodeCityPosition } from './city.js';
 import { hospital, hospitalWalkable } from './hospital.js';
+import { shop, training, locationFor, doorsFor, roomWalkable } from './urahara.js';
 import { maps, loot, drops, forms, powers, key, initial, worldSize, cameraFor, classPaths, mentors } from './data.js';
 
 export function createGame(world) {
@@ -29,8 +30,9 @@ export function createGame(world) {
   const classInfo = () => classPaths[state.classId];
   const attackRange = () => classInfo()?.range ?? 27;
   let walkingToMentor = null, activeMentor = null, walkingToDoor = null;
-  const outsideInCity = () => state.inPlaza && !state.inHospital;
-  const mentorIsHere = mentor => state.inPlaza && Boolean(mentor.hospital) === state.inHospital;
+  const location = () => locationFor(state);
+  const outsideInCity = () => location()==='city';
+  const mentorIsHere = mentor => state.inPlaza && (mentor.room ?? (mentor.hospital ? 'hospital' : 'city')) === location();
   const presence=createPresence();
   let hero, enemies, path = [], destination, clock = 0, previousFrame, manualUntil = 0, cooldown = 0, guard = 0,
       block = false, messages = [], effects = [], renderAt = 0, savedAt = 0, fightAt = 0, bossMode = false, hiddenSince = null;
@@ -87,7 +89,8 @@ export function createGame(world) {
       moving:hero.moving,running:hero.running
     }));
   }
-  function enter(zone, inPlaza=false, inHospital=false, spawnOverride) {
+  function enter(zone, inPlaza=false, inHospital=false, spawnOverride, room=null) {
+    state.uraharaRoom=room;
     state.zone=zone;
     state.inPlaza=inPlaza;
     state.inHospital=inHospital;
@@ -111,7 +114,7 @@ export function createGame(world) {
       const {x,y}=cellPoint(i);
       walkable[i]=Number(avoidWall(x,y));
     }
-    paintTerrain(state.zone,inPlaza,inHospital);
+    paintTerrain(state.zone,inPlaza,inHospital,room);
     if(outsideInCity() && !document.hidden) startPresence();
   }
   function finish(enemy) {
@@ -147,6 +150,7 @@ export function createGame(world) {
     if (enemy.hp<=0) finish(enemy);
   }
   function avoidWall(x,y) {
+    if(state.uraharaRoom) return roomWalkable(state.uraharaRoom,x,y);
     if(state.inHospital) return hospitalWalkable(x,y);
     if(state.inPlaza) return cityWalkable(x,y);
     return x>=9 && x<=worldSize.width-9 && y>=12 && y<=worldSize.height-9 && !nowMap().walls.some(([l,t,w,h])=>x>l-6 && x<l+w+6 && y>t-4 && y<t+h+6);
@@ -341,7 +345,7 @@ export function createGame(world) {
     });
     if (clock<hero.rest || activeMentor) return;
     if(walkingToDoor && far(hero,walkingToDoor)<=12) {
-      useHospitalDoor();
+      transit(walkingToDoor);
       return;
     }
     if(walkingToMentor && far(hero,walkingToMentor)<=28) {
@@ -464,7 +468,7 @@ export function createGame(world) {
     const remaining = Math.max(0,Math.ceil(cooldown-clock));
     const danger = inDanger();
     snapshot = {
-      inPlaza:state.inPlaza, inHospital:state.inHospital, plazaStatus:presence.status, plazaName:presence.name,
+      inPlaza:state.inPlaza, inHospital:state.inHospital, location:location(), doors:doorsFor(location()), plazaStatus:presence.status, plazaName:presence.name,
       plazaCount:presence.players.length+1,
       map, zone:state.zone, unlocked:state.unlocked, cleared:[...state.cleared],
       auto:state.auto, bossMode, bossReady:unlockedBoss(), trail:Math.min(state.kills[state.zone],map.goal),
@@ -482,7 +486,7 @@ export function createGame(world) {
     listeners.forEach(notify=>notify());
   }
   function openDistrict(index) {
-    if (state.inHospital || !state.classId || !maps[index] || (!state.inPlaza && index === state.zone) || index > state.unlocked) return;
+    if (state.inHospital || state.uraharaRoom || !state.classId || !maps[index] || (!state.inPlaza && index === state.zone) || index > state.unlocked) return;
     enter(index);
     log('Patrulha em '+nowMap().name+'.');
     save();
@@ -495,17 +499,23 @@ export function createGame(world) {
     save();
     publish();
   }
-  function useHospitalDoor() {
-    if(!state.inPlaza || activeMentor) return;
-    if(state.inHospital) {
-      enter(state.zone,true,false,hospital.entrance);
-      log('Você voltou à praça de Karakura.');
-    } else {
-      enter(state.zone,true,true);
-      log('Você entrou no Hospital de Karakura.');
-    }
+  function transit(door) {
+    if(!door || !state.inPlaza || activeMentor || !doorsFor(location()).some(d=>d.id===door.id)) return;
+    enter(state.zone,true,door.to==='hospital',door.spawn,['shop','training'].includes(door.to) ? door.to : null);
+    log(door.to==='training' ? 'Você desceu à câmara subterrânea de treinamento.' : door.to==='shop' ? 'Você entrou na Loja Urahara.' : door.to==='hospital' ? 'Você entrou no Hospital de Karakura.' : 'Você voltou a Karakura.');
     save();
     publish();
+  }
+  function visitDoor(id) {
+    const door=doorsFor(location()).find(d=>d.id===id);
+    if(!door || activeMentor) return;
+    if(far(hero,door)<=27) return transit(door);
+    walkingToMentor=null;
+    walkingToDoor=door;
+    setDestination(door);
+  }
+  function useHospitalDoor() {
+    visitDoor(state.inHospital ? 'hospital-exit' : 'hospital-enter');
   }
   function toggleHunt() {
     state.auto=!state.auto;
@@ -562,7 +572,7 @@ export function createGame(world) {
   function pointAt(event) {
     const bounds=world.getBoundingClientRect();
     if(!bounds.width || !bounds.height) return;
-    const camera=state.inHospital ? cameraFor(hospital.center,world.width,world.height)
+    const camera=location()==='shop' ? cameraFor(shop.center,world.width,world.height) : state.inHospital ? cameraFor(hospital.center,world.width,world.height)
       : (outsideInCity() ? cityCamera : cameraFor)(hero,world.width,world.height);
     const point={
       x:camera.x+(event.clientX-bounds.left)*world.width/bounds.width,
@@ -570,8 +580,8 @@ export function createGame(world) {
     };
     if(state.inPlaza) {
       if(activeMentor) return;
-      const door=state.inHospital ? hospital.exit : hospital.entrance;
-      if(Math.abs(point.x-door.x)<=29 && point.y>=door.y-32 && point.y<=door.y+14) {
+      const door=doorsFor(location()).find(d=>Math.abs(point.x-d.x)<=24 && point.y>=d.y-24 && point.y<=d.y+14);
+      if(door) {
         walkingToMentor=null;
         walkingToDoor=door;
         setDestination(door);
@@ -597,9 +607,9 @@ export function createGame(world) {
     const key=event.key.toLowerCase();
     if(key==='e' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey &&
         state.inPlaza && !activeMentor && event.target===world &&
-        far(hero,state.inHospital ? hospital.exit : hospital.entrance)<=27) {
+        doorsFor(location()).some(d=>far(hero,d)<=27)) {
       event.preventDefault();
-      useHospitalDoor();
+      transit(doorsFor(location()).find(d=>far(hero,d)<=27));
       return;
     }
     if (activeMentor || event.target.closest?.('dialog, input, select, textarea')) return;
@@ -635,7 +645,7 @@ export function createGame(world) {
     if(!document.hidden) {
       simulate(Math.min(.055,Math.max(0,(time-(previousFrame??time))/1000)));
       draw({zone:state.zone,form:state.form,classId:state.classId,hero,enemies,destination,effects,clock,fightAt,
-        inHospital:state.inHospital, plazaView:outsideInCity() ? presence : null});
+        inHospital:state.inHospital, uraharaRoom:state.uraharaRoom, plazaView:outsideInCity() ? presence : null});
       if(Date.now()-savedAt>=3500) save();
       if(time>=renderAt) {
         renderAt=time+100;
@@ -646,8 +656,9 @@ export function createGame(world) {
     animationId=requestAnimationFrame(frame);
   }
   harvest((Date.now()-state.savedAt)/1000);
-  enter(state.zone,state.inPlaza ?? true,Boolean(state.inPlaza && state.inHospital));
-  log(state.inHospital ? 'Você está no Hospital de Karakura.' : state.inPlaza ? 'Você chegou à Praça Principal.' : 'Patrulha em '+nowMap().name+'.');
+  const restoredRoom=state.inPlaza && ['shop','training'].includes(state.uraharaRoom) ? state.uraharaRoom : null;
+  enter(state.zone,state.inPlaza ?? true,Boolean(state.inPlaza && state.inHospital),restoredRoom==='shop' ? shop.spawn : restoredRoom==='training' ? training.spawn : undefined,restoredRoom);
+  log(state.uraharaRoom==='shop' ? 'Você está na Loja Urahara.' : state.uraharaRoom==='training' ? 'Você está na câmara subterrânea de treinamento.' : state.inHospital ? 'Você está no Hospital de Karakura.' : state.inPlaza ? 'Você chegou à Praça Principal.' : 'Patrulha em '+nowMap().name+'.');
   save();
   publish();
   world.addEventListener('pointerdown',pointAt);
@@ -664,7 +675,7 @@ export function createGame(world) {
       listeners.add(notify);
       return ()=>listeners.delete(notify);
     },
-    useHospitalDoor,visitMentor,closeMentor,chooseClass,healWithInoue,addPoint,setGear,reinforce,openDistrict,openPlaza,toggleHunt,trackBoss,defend,useSkill,release,
+    visitDoor,useHospitalDoor,visitMentor,closeMentor,chooseClass,healWithInoue,addPoint,setGear,reinforce,openDistrict,openPlaza,toggleHunt,trackBoss,defend,useSkill,release,
     dispose() {
       cancelAnimationFrame(animationId);
       world.removeEventListener('pointerdown',pointAt);

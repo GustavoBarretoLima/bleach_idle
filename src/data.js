@@ -12,7 +12,7 @@ export const classPaths = {
 };
 
 export const mentors = [
-  {id:'shinigami', name:'Kisuke Urahara', label:'Urahara', place:'Loja Urahara', x:610, y:450, approachY:463,
+  {id:'shinigami', name:'Kisuke Urahara', label:'Urahara', place:'Balcão da Loja Urahara', room:'shop', x:440, y:300, approachY:323,
     dialogue:'Se consegue sentir a pressão espiritual da cidade, já tem por onde começar. Passe na minha loja e vamos despertar sua lâmina.'},
   {id:'quincy', name:'Ryūken Ishida', label:'Ryūken', place:'Recepção', hospital:true, x:504, y:263, approachY:287,
     dialogue:'Uma flecha Quincy começa pela concentração. Posso ensinar você a reunir o Reishi ao seu redor e dar forma a ele.'},
