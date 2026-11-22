@@ -116,7 +116,7 @@ export const shikaiFrames={
             ],
             "hand": [
               1415,
-              133
+              123
             ]
           },
           {
@@ -382,7 +382,7 @@ export const shikaiFrames={
             ],
             "hand": [
               1468,
-              548
+              538
             ]
           },
           {
@@ -514,8 +514,8 @@ export const shikaiFrames={
               825
             ],
             "hand": [
-              1472,
-              746
+              1463,
+              758
             ]
           },
           {
