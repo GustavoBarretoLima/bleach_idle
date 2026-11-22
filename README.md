@@ -93,6 +93,10 @@ npm run preview
 node --test tests/urahara.test.js
 ```
 
+## Mapas e apresentação
+
+Karakura e a Loja Urahara usam pisos editáveis no Tiled, apresentação em Phaser e a interface React existente. Veja [como editar e verificar os mapas](docs/world-rendering.md).
+
 ## Organização do projeto
 
 | Caminho | Conteúdo |

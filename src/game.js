@@ -1,4 +1,4 @@
-import { createRenderer } from './renderer.js';
+import { createWorldRenderer } from './world/phaser-renderer.js';
 import { createPresence } from './presence.js';
 import { city, cityCamera, cityWalkable, encodeCityPosition } from './city.js';
 import { hospital, hospitalWalkable } from './hospital.js';
@@ -42,7 +42,8 @@ export function createGame(world) {
   const keys = new Set();
   let plannedTarget, repathAt = 0;
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-  const {paintTerrain, draw} = createRenderer(world, reducedMotion);
+  const renderer = createWorldRenderer(world, reducedMotion);
+  const {paintTerrain, draw} = renderer;
   const cell = 16;
   const nx = Math.ceil(worldSize.width/cell), ny = Math.ceil(worldSize.height/cell);
   let walkable;
@@ -681,6 +682,7 @@ export function createGame(world) {
     visitDoor,useHospitalDoor,visitMentor,closeMentor,chooseClass,healWithInoue,addPoint,setGear,reinforce,openDistrict,openPlaza,toggleHunt,trackBoss,defend,useSkill,release,
     dispose() {
       cancelAnimationFrame(animationId);
+      renderer.dispose();
       world.removeEventListener('pointerdown',pointAt);
       document.removeEventListener('keydown',keydown);
       document.removeEventListener('keyup',keyup);
