@@ -97,7 +97,8 @@ export function createWorldRenderer(world,reducedMotion) {
     }
   }
   try{
-    engine=new Phaser.Game({type:Phaser.Device.Features.webGL?Phaser.WEBGL:Phaser.CANVAS,canvas:output,parent:world.parentElement,width:world.width,height:world.height,
+    const webgl=output.getContext('webgl',{alpha:false,antialias:false});
+    engine=new Phaser.Game({type:webgl?Phaser.WEBGL:Phaser.CANVAS,canvas:output,parent:world.parentElement,width:world.width,height:world.height,
       backgroundColor:'#233237',pixelArt:true,roundPixels:true,antialias:false,
       banner:false,audio:{noAudio:true},input:{keyboard:false,mouse:false,touch:false,gamepad:false},
       fps:{target:30,forceSetTimeOut:true},scene:[KarakuraScene]});
