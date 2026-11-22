@@ -2,6 +2,7 @@
 
 ## Em desenvolvimento
 
+- Recuperadas as folhas originais de movimento do Ichigo Shikai, com Zangetsu incorporada às poses de caminhada e corrida e escala proporcional.
 - Ichigo Kurosaki disponível como personagem jogável de teste, iniciando como Shinigami com Shikai e Zangetsu.
 - Partidas existentes recebem o personagem de teste sem perder níveis, itens ou progresso; Bankai já liberada é mantida.
 
