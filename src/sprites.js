@@ -1,5 +1,6 @@
 import atlasUrl from './gait-atlas.webp';
 import frames from './gait-frames.json';
+import {drawOriginalIchigoMovement} from './ichigo/movement.js';
 
 // Frames authored for BleachSoulBreak-Godot, packed with their original foot anchors.
 const atlas = new Image();
@@ -27,10 +28,11 @@ function drawBankaiBlade(ctx, frame, direction, action, phase) {
 }
 
 export function drawHeroPose(ctx, actor, form, clock, fightAt, reducedMotion) {
-  if (!atlas.complete || !atlas.naturalWidth) return false;
   const attackElapsed = clock - fightAt;
   const attacking = fightAt > 0 && attackElapsed >= 0 && attackElapsed < swingDuration;
   const action = reducedMotion ? 'idle' : attacking ? 'attack' : actor.moving ? actor.running ? 'run' : 'walk' : 'idle';
+  if (form === 1 && action !== 'attack' && drawOriginalIchigoMovement(ctx, actor.direction, action, (actor.gaitTime % cycle) / cycle)) return true;
+  if (!atlas.complete || !atlas.naturalWidth) return false;
   const strip = frames[form][actor.direction][action];
   const elapsed = attacking ? attackElapsed / swingDuration : (actor.gaitTime % cycle) / cycle;
   const phase = Math.min(strip.length - 1, Math.floor(elapsed * strip.length));
