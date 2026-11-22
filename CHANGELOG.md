@@ -2,6 +2,10 @@
 
 ## Em desenvolvimento
 
+- Corrigida a animação de ataque do Ichigo Shikai: arco de corte mais curto por direção, preparação, impacto e recuperação antes de voltar ao ombro.
+- Corrigidos os pontos de encaixe do cabo nos punhos dos quadros de impacto de frente, costas e direita.
+- Zangetsu permanece ancorada à mão e passa atrás do corpo na preparação/retorno; rastro breve indica a direção do golpe.
+
 - Ichigo Shikai recebe sprites mais nítidas para repouso, caminhada, corrida e ataque, com quatro direções desenhadas separadamente.
 - Zangetsu baseada na referência enviada, com cabo e lâmina em uma única textura rígida, ancorada à mão e sem deformação entre poses.
 - Nova animação de defesa: preparação, levantamento, guarda, reação ao impacto e retorno; parry usa recuo e faíscas no ponto de contato.

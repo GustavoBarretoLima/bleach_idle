@@ -1,11 +1,11 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {shikaiFrames} from '../src/ichigo/v2/frames.js';
-import {selectShikaiPose,poseGeometry} from '../src/ichigo/v2/pose.js';
+import {selectShikaiPose,poseGeometry,shikaiAttackPose,shikaiAttackDuration,shortestTurn} from '../src/ichigo/v2/pose.js';
 globalThis.Image=class{};
 const {drawShikaiLayers}=await import('../src/ichigo/v2/renderer.js');
 const textures={body:{id:'body'},guard:{id:'guard'},weapon:{id:'weapon'}};
-function context(){return {images:[],rotations:[],save(){},restore(){},translate(){},rotate(angle){this.rotations.push(angle);},drawImage(...args){this.images.push(args);},beginPath(){},ellipse(){},clip(){},moveTo(){},lineTo(){},stroke(){}};}
+function context(){return {images:[],rotations:[],save(){},restore(){},translate(){},rotate(angle){this.rotations.push(angle);},drawImage(...args){this.images.push(args);},beginPath(){},arc(){},ellipse(){},clip(){},moveTo(){},lineTo(){},stroke(){}};}
 
 test('Every body and guard pose has an in-bounds source rectangle and hand anchor',()=>{
   for(const sheet of ['body','guard'])for(const strip of Object.values(shikaiFrames[sheet].directions))for(const frame of strip.frames){
@@ -46,4 +46,25 @@ test('Reduced motion keeps a readable braced defense pose and stops gait oscilla
   const actor={direction:'down',defenseStartedAt:10,defendingUntil:10.65};
   assert.equal(selectShikaiPose(actor,10.01,0,true).frame,2);
   assert.equal(selectShikaiPose({direction:'right',moving:true,gaitTime:.2},10,0,true).action,'idle');
+});
+
+test('Attack prepares, cuts, follows through and recovers without snapping back to idle',()=>{
+  for(const direction of ['down','left','up','right']){
+    const actor={direction};
+    const phases=[.03,.1,.18,.28,.4].map(t=>selectShikaiPose(actor,10+t,10).attackPhase);
+    assert.deepEqual(phases,['windup','contact','follow','recover','settle']);
+    const ready=selectShikaiPose(actor,11,0);
+    const first=shikaiAttackPose(direction,0),last=shikaiAttackPose(direction,shikaiAttackDuration-.001);
+    assert.ok(Math.abs(shortestTurn(first.angle,ready.angle))<1e-9);
+    assert.ok(Math.abs(shortestTurn(last.angle,ready.angle))<1e-9);
+    assert.equal(last.frame,ready.frame);
+    for(const boundary of [.07,.15,.21,.37])assert.ok(Math.abs(shortestTurn(shikaiAttackPose(direction,boundary-.00001).angle,shikaiAttackPose(direction,boundary+.00001).angle))<.002);
+  }
+});
+test('The active slash has a compact arc and reduced motion uses one stable contact pose',()=>{
+  for(const direction of ['down','left','up','right']){
+    const start=shikaiAttackPose(direction,.07),end=shikaiAttackPose(direction,.209999);
+    assert.ok(Math.abs(end.angle-start.angle)<1.6);
+    assert.deepEqual(shikaiAttackPose(direction,.02,true),shikaiAttackPose(direction,.3,true));
+  }
 });

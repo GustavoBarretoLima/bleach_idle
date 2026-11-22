@@ -25,6 +25,12 @@ export function drawShikaiLayers(ctx,textures,actor,clock,fightAt,reducedMotion=
     // Repaint the gripping fingers over the hilt using the exact same body frame.
     ctx.save();ctx.beginPath();ctx.ellipse(geometry.hand[0],geometry.hand[1],1.8,2.1,0,0,Math.PI*2);ctx.clip();body();ctx.restore();
   }
+  if(pose.action==='attack'&&pose.attackAge>=.08&&pose.attackAge<.2&&!reducedMotion){
+    const bearing={down:Math.PI/2,left:Math.PI,up:-Math.PI/2,right:0}[pose.direction];
+    ctx.save();ctx.globalAlpha=(1-(pose.attackAge-.08)/.12)*.55;
+    ctx.strokeStyle='#f4edd9';ctx.lineWidth=1.2;
+    ctx.beginPath();ctx.arc(geometry.hand[0],geometry.hand[1],25,bearing-.45,bearing+.45);ctx.stroke();ctx.restore();
+  }
   if(pose.action==='parry'){
     const intensity=reducedMotion ? .65 : Math.max(0,1-pose.parryAge/.35);
     const x=geometry.hand[0]+Math.cos(pose.angle)*19,y=geometry.hand[1]+Math.sin(pose.angle)*19;
