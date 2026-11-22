@@ -1,7 +1,8 @@
 import {test,expect} from '@playwright/test';
 
 test('Phaser keeps input aligned, and city, shop and underground remain connected',async({page})=>{
-  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  const errors=[];page.on('pageerror',error=>{errors.push(error.message);console.error('Page error:',error.message)});
+  page.on('console',message=>{if(['warning','error'].includes(message.type()))console.log('Browser:',message.text());});
   await page.goto('/');
   await expect(page.locator('.phaser-world')).toHaveAttribute('data-renderer','phaser');
   const input=page.locator('canvas[tabindex="0"]');
