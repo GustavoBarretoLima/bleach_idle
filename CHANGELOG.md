@@ -2,6 +2,9 @@
 
 ## Em desenvolvimento
 
+- Ichigo Kurosaki disponível como personagem jogável de teste, iniciando como Shinigami com Shikai e Zangetsu.
+- Partidas existentes recebem o personagem de teste sem perder níveis, itens ou progresso; Bankai já liberada é mantida.
+
 - Karakura recriada com ruas, escola, clínica, hospital, rio e pontes.
 - Interior da Loja Urahara com balcão de doces, artigos espirituais, portas shoji, tatami e mesa de chá.
 - Urahara atende dentro da loja e mantém a escolha da classe Shinigami.

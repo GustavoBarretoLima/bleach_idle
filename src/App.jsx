@@ -118,7 +118,7 @@ function CharacterPanel({ view, game }) {
   return <aside className="side">
     <section className="panel profile">
       <div className="profileTop"><span className="portrait" style={{color:view.classInfo?.color}} aria-hidden="true">{view.classInfo?.icon ?? '人'}</span>
-        <div><h2>Ren Amagiri</h2><small>{view.classInfo?.name ?? 'Humano'} · Nível {view.level}{view.form && ' · '+view.form}</small></div>
+        <div><h2>{view.characterName}</h2><small>{view.classInfo?.name ?? 'Humano'} · Nível {view.level}{view.form && ' · '+view.form}</small></div>
       </div>
       <div className="stats"><div className="stat">Ataque <b>{fmt.format(view.attack)}</b></div>
         <div className="stat">PV máx. <b>{fmt.format(view.maxHp)}</b></div>
