@@ -2,6 +2,11 @@
 
 ## Em desenvolvimento
 
+- Ichigo Shikai recebe sprites mais nítidas para repouso, caminhada, corrida e ataque, com quatro direções desenhadas separadamente.
+- Zangetsu baseada na referência enviada, com cabo e lâmina em uma única textura rígida, ancorada à mão e sem deformação entre poses.
+- Nova animação de defesa: preparação, levantamento, guarda, reação ao impacto e retorno; parry usa recuo e faíscas no ponto de contato.
+- Animações respeitam movimento reduzido; a janela de parry e os atalhos J/K permanecem iguais.
+
 - Combate manual por teclado: J ataca, K defende; parry nos primeiros 180 ms da defesa anula o golpe e atordoa o inimigo por 750 ms.
 - Dez slots de magia com seleção de habilidades aprendidas, atalhos configuráveis, proteção contra conflitos e salvamento no navegador.
 - Barra de combate utilizável por toque, indicação de recarga compartilhada, efeitos de defesa/parry e caça automática opcional.

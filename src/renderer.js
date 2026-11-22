@@ -303,7 +303,7 @@ export function createRenderer(world, reducedMotion, {separateGround=false, tran
     const step=actor.moving&&!reducedMotion.matches ? Math.floor(clock*12)%2 : 0;
     ctx.save();ctx.translate(Math.round(x),Math.round(y));
     ellipse(ctx,'#171a1bc2',0,2,11,4);
-    if(clock<(actor.parryFlashUntil??0)||clock<(actor.defendingUntil??0)){
+    if(form!==1&&(clock<(actor.parryFlashUntil??0)||clock<(actor.defendingUntil??0))){
       const parry=clock<(actor.parryFlashUntil??0);
       ctx.strokeStyle=parry?'#a1fff0':'#e6d29b';ctx.lineWidth=parry?3:2;
       ctx.beginPath();ctx.ellipse(0,-16,parry?21:17,23,0,0,Math.PI*2);ctx.stroke();
