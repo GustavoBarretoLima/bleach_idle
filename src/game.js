@@ -1,3 +1,5 @@
+import {controlsKey,learnedSpells,normalizeHotbar,assignHotkey} from './controls.js';
+import {combatTiming,resolveDefense} from './combat-timing.js';
 import { createWorldRenderer } from './world/phaser-renderer.js';
 import { createPresence } from './presence.js';
 import { city, cityCamera, cityWalkable, encodeCityPosition } from './city.js';
@@ -30,6 +32,10 @@ export function createGame(world) {
   // Apply the test character to existing saves without resetting their progress.
   state.classId = testCharacter.classId;
   state.form = Math.max(testCharacter.form, state.form ?? 0);
+  if(state.controlsVersion!==1){state.auto=false;state.controlsVersion=1;}
+  let hotbar;
+  try{hotbar=normalizeHotbar(JSON.parse(localStorage.getItem(controlsKey)),learnedSpells(state));}
+  catch{hotbar=normalizeHotbar(null,learnedSpells(state));}
   const classInfo = () => classPaths[state.classId];
   const attackRange = () => classInfo()?.range ?? 27;
   let walkingToMentor = null, activeMentor = null, walkingToDoor = null;
@@ -38,7 +44,7 @@ export function createGame(world) {
   const mentorIsHere = mentor => state.inPlaza && (mentor.room ?? (mentor.hospital ? 'hospital' : 'city')) === location();
   const presence=createPresence();
   let hero, enemies, path = [], destination, clock = 0, previousFrame, manualUntil = 0, cooldown = 0, guard = 0,
-      block = false, messages = [], effects = [], renderAt = 0, savedAt = 0, fightAt = 0, bossMode = false, hiddenSince = null;
+      block = false, defenseAt = -Infinity, defenseUntil = -Infinity, messages = [], effects = [], renderAt = 0, savedAt = 0, fightAt = 0, bossMode = false, hiddenSince = null;
   const keys = new Set();
   let plannedTarget, repathAt = 0;
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -110,7 +116,7 @@ export function createGame(world) {
     walkingToDoor=null;
     activeMentor=null;
     bossMode=false;
-    block=false;
+    block=false;defenseAt=-Infinity;defenseUntil=-Infinity;
     effects=[];
     manualUntil=0;
     walkable=new Uint8Array(nx*ny);
@@ -295,7 +301,7 @@ export function createGame(world) {
     return true;
   }
   function moveEnemy(enemy, dt) {
-    if(enemy.charge || enemy.strikeAt) return;
+    if(enemy.charge || enemy.strikeAt || clock<(enemy.stunnedUntil??0)) return;
     const distance=far(hero,enemy), homeDistance=far(hero,enemy.home);
     const leash=enemy.boss ? 92 : 76;
     const canEngage=clock>=hero.rest && (!bossMode || enemy.boss);
@@ -315,13 +321,28 @@ export function createGame(world) {
       enemy.patrolDirection*=-1;
     }
   }
+  function receiveAttack(enemy,damage) {
+    const result=block?resolveDefense(damage,clock,defenseAt,defenseUntil):{type:'hit',damage};
+    block=false;defenseUntil=-Infinity;hero.defendingUntil=0;
+    if(result.type==='parry') {
+      enemy.stunnedUntil=clock+combatTiming.stun;
+      enemy.swing=Math.max(enemy.swing,enemy.stunnedUntil);
+      enemy.charge=0;enemy.strikeAt=0;
+      hero.parryFlashUntil=clock+.35;
+      effects.push({x:hero.x,y:hero.y-40,text:'PARRY!',color:'#a1fff0',until:clock+.8});
+      log('Parry! Golpe anulado e inimigo atordoado.');
+    }else{
+      if(result.type==='block')effects.push({x:hero.x,y:hero.y-40,text:'Defesa',color:'#f8d79c',until:clock+.6});
+      hurt(result.damage);
+    }
+  }
   function attackHero(enemy) {
+    if(clock<(enemy.stunnedUntil??0))return;
     if(enemy.boss) {
       if(enemy.charge && clock>=enemy.charge) {
         enemy.charge=0;
         enemy.attackAt=clock;
-        if(far(hero,enemy)<=36 && clearToHero(enemy)) hurt(block ? Math.ceil(nowMap().bossDmg/4) : nowMap().bossDmg);
-        block=false;
+        if(far(hero,enemy)<=36 && clearToHero(enemy)) receiveAttack(enemy,nowMap().bossDmg);
       } else if(!enemy.charge && enemy.alert && far(hero,enemy)<=36 && clock>=enemy.swing && clearToHero(enemy)) {
         enemy.charge=clock+1.1;
         enemy.swing=clock+2.6;
@@ -332,7 +353,7 @@ export function createGame(world) {
     if(enemy.strikeAt && clock>=enemy.strikeAt) {
       enemy.strikeAt=0;
       enemy.attackAt=clock;
-      if(inReach) hurt(nowMap().dmg);
+      if(inReach) receiveAttack(enemy,nowMap().dmg);
     } else if(!enemy.strikeAt && enemy.alert && inReach && clock>=enemy.swing) {
       enemy.strikeAt=clock+.3;
       enemy.swing=clock+.95;
@@ -340,6 +361,7 @@ export function createGame(world) {
   }
   function simulate(dt) {
     clock+=dt;
+    if(block&&clock>defenseUntil){block=false;hero.defendingUntil=0;}
     hero.moving=false;
     hero.running=false;
     effects=effects.filter(effect=>effect.until>clock);
@@ -378,7 +400,8 @@ export function createGame(world) {
       } else if(destination && !destination.max && !path.length) destination=null;
     }
     const enemy=destination?.max && destination.hp>0 ? destination : null;
-    if(enemy && far(hero,enemy)<=attackRange() && clock-fightAt>=.59 && clearToHero(enemy)) strike(enemy,attack());
+    if(state.auto && enemy && far(hero,enemy)<=attackRange() && clock-fightAt>=combatTiming.attack && clearToHero(enemy)) strike(enemy,attack());
+    if(keys.has('j')) basicAttack();
     for (const e of enemies) {
       if(e.hp<=0 || (bossMode && !e.boss)) continue;
       attackHero(e);
@@ -401,7 +424,7 @@ export function createGame(world) {
       enemy.strikeAt=0;
     }
     Object.assign(hero,xy(nowMap().rally),{hp:health(),rest:clock+2.4});
-    log('Ren recuou e voltou ao ponto seguro.');
+    log('Ichigo recuou e voltou ao ponto seguro.');
   }
   function harvest(seconds) {
     if(state.inPlaza || !state.auto || seconds<12) return;
@@ -460,9 +483,39 @@ export function createGame(world) {
     const boss = enemies.find(enemy => enemy.boss && enemy.hp > 0);
     return Boolean(boss && boss.charge > clock && far(hero,boss) <= 36);
   }
-  function canUseSkill() {
-    return !state.inPlaza && clock >= cooldown && destination?.max && destination.hp > 0
-      && far(hero,destination) <= Math.max(42,attackRange()) && clearToHero(destination) && clock >= hero.rest;
+  function combatTarget(range) {
+    const valid=enemy=>enemy?.max&&enemy.hp>0&&(!bossMode||enemy.boss)&&far(hero,enemy)<=range&&clearToHero(enemy);
+    if(valid(destination))return destination;
+    return enemies.filter(valid).sort((a,b)=>far(hero,a)-far(hero,b))[0]??null;
+  }
+  function canDefend(){return !state.inPlaza&&!activeMentor&&clock>=hero.rest&&!block&&clock>=guard;}
+  function canUseSkill(spell=learnedSpells(state).at(-1)) {
+    return Boolean(spell&&!state.inPlaza&&!activeMentor&&clock>=cooldown&&clock>=hero.rest&&combatTarget(Math.max(42,attackRange())));
+  }
+  function basicAttack() {
+    if(state.inPlaza||activeMentor||clock<hero.rest||clock-fightAt<combatTiming.attack)return false;
+    const enemy=combatTarget(attackRange());
+    if(state.auto){state.auto=false;setDestination(null);save();}
+    if(enemy)strike(enemy,attack());else fightAt=clock;
+    publish();return true;
+  }
+  function configureSlot(index,spellId){
+    if(!Number.isInteger(index)||index<0||index>=10)return;
+    if(spellId!==null&&!learnedSpells(state).some(spell=>spell.id===spellId))return;
+    hotbar=hotbar.map((slot,i)=>i===index?{...slot,spellId}:slot);saveControls();
+  }
+  function bindSlot(index,key){
+    const result=assignHotkey(hotbar,index,key);
+    if(result.error)return result.error;
+    hotbar=result.slots;saveControls();return null;
+  }
+  function saveControls(){
+    try{localStorage.setItem(controlsKey,JSON.stringify(hotbar));}catch{storageOK=false;}
+    publish();
+  }
+  function useSlot(index){
+    const spell=learnedSpells(state).find(spell=>spell.id===hotbar[index]?.spellId);
+    if(spell)useSkill(spell.id);
   }
   function canRelease() {
     return state.classId === 'shinigami' && state.form < 2 && state.level >= (state.form === 0 ? 4 : 9) && state.cleared[state.form];
@@ -471,6 +524,10 @@ export function createGame(world) {
     const map = nowMap();
     const remaining = Math.max(0,Math.ceil(cooldown-clock));
     const danger = inDanger();
+    const incoming=enemies.filter(enemy=>enemy.hp>0 && clock>=(enemy.stunnedUntil??0) && far(hero,enemy)<=(enemy.boss?36:25) && clearToHero(enemy))
+      .map(enemy=>({due:enemy.boss?enemy.charge:enemy.strikeAt,duration:enemy.boss?1.1:.3}))
+      .filter(attack=>attack.due>clock).sort((a,b)=>a.due-b.due)[0];
+    const impactMs=incoming?Math.ceil((incoming.due-clock)*1000):0;
     snapshot = {
       inPlaza:state.inPlaza, inHospital:state.inHospital, location:location(), doors:doorsFor(location()), plazaStatus:presence.status, plazaName:presence.name,
       plazaCount:presence.players.length+1,
@@ -482,8 +539,13 @@ export function createGame(world) {
       form:state.classId==='shinigami' ? forms[state.form] : null, nextForm:['Shikai','Bankai','Liberado'][state.form],
       formHint:['Nível 4 e chefe de Karakura','Nível 9 e chefe do Distrito do Vapor','Liberação máxima'][state.form],
       releaseReady:canRelease(), skill:(state.form ? powers[state.form] : classInfo()?.skill ?? powers[0])+(remaining?' · '+remaining+'s':''),
-      skillReady:Boolean(canUseSkill()), guardReady:danger && !block && clock>=guard,
-      warning:danger?(block?'Defesa preparada':'Golpe espiritual! Defenda ou saia da área.'):'',
+      skillReady:Boolean(canUseSkill()), attackReady:!state.inPlaza&&clock>=hero.rest&&clock-fightAt>=combatTiming.attack,
+      guardReady:canDefend(), guardRemaining:Math.max(0,Math.ceil((guard-clock)*10)/10),
+      defending:block, parryFlash:clock<(hero.parryFlashUntil??0),
+      spells:learnedSpells(state), hotbar:hotbar.map(slot=>({...slot,spell:learnedSpells(state).find(spell=>spell.id===slot.spellId)??null})),
+      spellRemaining:remaining,
+      impactMs, impactDuration:incoming?incoming.duration*1000:0,
+      warning:incoming?(block?'Defesa preparada':impactMs<=180&&canDefend()?'Agora! K para parry.':'Ataque iminente! Defenda ou saia da área.'):danger?'Golpe espiritual! Defenda ou saia da área.':'',
       equipped:{...state.gear}, inventory:state.bag.map(id=>({id,...loot[id],value:itemStat(id),cost:equipCost(id),upgrade:state.upgrades[id]??0})),
       messages, offlineMessage, storageOK,
     };
@@ -549,20 +611,22 @@ export function createGame(world) {
     publish();
   }
   function defend() {
-    if (!inDanger() || block || clock < guard) return;
-    block=true;
-    guard=clock+1.6;
+    if(!canDefend())return;
+    block=true;defenseAt=clock;defenseUntil=clock+combatTiming.defense;
+    hero.defendingUntil=defenseUntil;
+    guard=clock+combatTiming.guardCooldown;
     publish();
   }
-  function useSkill() {
-    if (!canUseSkill()) return;
-    cooldown=clock+5.8;
-    const {power,recovery}=classInfo();
-    strike(destination,Math.round(attack()*(power+state.form*.55)),true);
-    if(recovery) {
-      const restored=Math.min(Math.ceil(health()*recovery),Math.floor(health()-hero.hp));
+  function useSkill(id) {
+    const spells=learnedSpells(state),spell=id?spells.find(spell=>spell.id===id):spells.at(-1);
+    if(!spell||!canUseSkill(spell))return;
+    const enemy=combatTarget(Math.max(42,attackRange()));
+    cooldown=clock+combatTiming.spellCooldown;
+    strike(enemy,Math.round(attack()*spell.power),true);
+    if(spell.recovery) {
+      const restored=Math.min(Math.ceil(health()*spell.recovery),Math.floor(health()-hero.hp));
       hero.hp+=restored;
-      if(restored) effects.push({x:hero.x,y:hero.y-26,text:'+'+restored+' PV',color:'#a5edbc',until:clock+.85});
+      if(restored)effects.push({x:hero.x,y:hero.y-26,text:'+'+restored+' PV',color:'#a5edbc',until:clock+.85});
     }
     publish();
   }
@@ -609,18 +673,20 @@ export function createGame(world) {
   }
   function keydown(event) {
     const key=event.key.toLowerCase();
-    if(key==='e' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey &&
-        state.inPlaza && !activeMentor && event.target===world &&
-        doorsFor(location()).some(d=>far(hero,d)<=27)) {
-      event.preventDefault();
-      transit(doorsFor(location()).find(d=>far(hero,d)<=27));
-      return;
+    if(activeMentor||event.isComposing||event.ctrlKey||event.metaKey||event.altKey||event.defaultPrevented||
+      event.target.closest?.('dialog, input, select, textarea, button, [contenteditable="true"]'))return;
+    if(key==='e'&&!event.repeat&&state.inPlaza&&event.target===world){
+      const door=doorsFor(location()).find(door=>far(hero,door)<=27);
+      if(door){event.preventDefault();transit(door);}return;
     }
-    if (activeMentor || event.target.closest?.('dialog, input, select, textarea')) return;
-    if (!movement.has(key) || event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
-    if (key.startsWith('arrow') && event.target.closest?.('[role="tablist"]')) return;
-    keys.add(key);
+    if(movement.has(key)) {keys.add(key);event.preventDefault();return;}
+    const slot=hotbar.findIndex(slot=>slot.key===key);
+    if(key!=='j'&&key!=='k'&&slot<0)return;
     event.preventDefault();
+    if(event.repeat)return;
+    if(key==='j'){keys.add(key);basicAttack();}
+    else if(key==='k')defend();
+    else useSlot(slot);
   }
   function keyup(event) { keys.delete(event.key.toLowerCase()); }
   function blur() { keys.clear(); }
@@ -679,7 +745,7 @@ export function createGame(world) {
       listeners.add(notify);
       return ()=>listeners.delete(notify);
     },
-    visitDoor,useHospitalDoor,visitMentor,closeMentor,chooseClass,healWithInoue,addPoint,setGear,reinforce,openDistrict,openPlaza,toggleHunt,trackBoss,defend,useSkill,release,
+    visitDoor,useHospitalDoor,visitMentor,closeMentor,chooseClass,healWithInoue,addPoint,setGear,reinforce,openDistrict,openPlaza,toggleHunt,trackBoss,basicAttack,defend,useSkill,useSlot,configureSlot,bindSlot,release,
     dispose() {
       cancelAnimationFrame(animationId);
       renderer.dispose();

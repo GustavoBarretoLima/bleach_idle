@@ -303,6 +303,12 @@ export function createRenderer(world, reducedMotion, {separateGround=false, tran
     const step=actor.moving&&!reducedMotion.matches ? Math.floor(clock*12)%2 : 0;
     ctx.save();ctx.translate(Math.round(x),Math.round(y));
     ellipse(ctx,'#171a1bc2',0,2,11,4);
+    if(clock<(actor.parryFlashUntil??0)||clock<(actor.defendingUntil??0)){
+      const parry=clock<(actor.parryFlashUntil??0);
+      ctx.strokeStyle=parry?'#a1fff0':'#e6d29b';ctx.lineWidth=parry?3:2;
+      ctx.beginPath();ctx.ellipse(0,-16,parry?21:17,23,0,0,Math.PI*2);ctx.stroke();
+      if(parry){ctx.fillStyle='#a1fff033';ctx.fill();}
+    }
     const frame=mentor ? mentorFrames[actor.classId] : undefined;
     if(frame!==undefined && mentorAtlas.naturalWidth) {
       ctx.drawImage(mentorAtlas,frame*48,0,48,56,-19,-44,38,44);
@@ -407,6 +413,9 @@ export function createRenderer(world, reducedMotion, {separateGround=false, tran
   function monster(enemy,zone,clock,hero) {
     const {x,y,boss,demi,hp,max}=enemy;
     if(hp<=0) return;
+    if(clock<(enemy.stunnedUntil??0)){
+      ctx.font='bold 9px monospace';ctx.textAlign='center';ctx.fillStyle='#a1fff0';ctx.fillText('ATORDOADO',x,y-47);
+    }
     if(enemy.charge) {
       ellipse(ctx,'#eb725b6f',x,y,33,20);
       ellipse(ctx,'#ee9b7652',x,y,24,14);

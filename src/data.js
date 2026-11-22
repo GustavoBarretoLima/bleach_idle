@@ -67,4 +67,4 @@ export const powers = ['Corte espiritual','Lua Partida','Eclipse da Vigília'];
 export const key = 'bleach-idle-vigilia-v1';
 // Temporary playable preset for the current test. Reuses the original Ichigo atlas.
 export const testCharacter = {name:'Ichigo Kurosaki', classId:'shinigami', form:1};
-export const initial = () => ({version:3, classId:testCharacter.classId, inPlaza:true, level:1,xp:0,reishi:18,str:0,vit:0,points:0,legacyBlade:0,legacyArmor:0,form:testCharacter.form,zone:0,unlocked:0,kills:[0,0,0],cleared:[false,false,false],auto:true,bag:[],gear:{blade:null,armor:null},upgrades:{},savedAt:Date.now()});
+export const initial = () => ({version:3, classId:testCharacter.classId, inPlaza:true, level:1,xp:0,reishi:18,str:0,vit:0,points:0,legacyBlade:0,legacyArmor:0,form:testCharacter.form,zone:0,unlocked:0,kills:[0,0,0],cleared:[false,false,false],auto:false,controlsVersion:1,bag:[],gear:{blade:null,armor:null},upgrades:{},savedAt:Date.now()});

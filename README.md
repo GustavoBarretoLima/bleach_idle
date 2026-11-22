@@ -93,6 +93,14 @@ npm run preview
 node --test tests/urahara.test.js
 ```
 
+## Combate e atalhos
+
+- **WASD / setas:** mover; **E:** atravessar uma porta próxima.
+- **J:** ataque básico (segurar repete respeitando a velocidade de ataque); **K:** defesa de 650 ms, com recarga de 1,1 s.
+- **Parry:** defender até 180 ms antes do impacto anula o dano e atordoa o atacante por 750 ms. Depois da janela de parry, a defesa reduz o dano em 75% até expirar; cada defesa protege de um golpe.
+- **10 slots de magia:** use “Configurar magias e teclas” para escolher habilidades aprendidas e personalizar as teclas. Os padrões são 1–9 e 0; configurações ficam salvas no navegador. Magias compartilham a recarga de 5,8 s.
+- Os botões também funcionam por toque. A caça automática é opcional; partidas novas e a primeira entrada nesta atualização iniciam no combate manual.
+
 ## Mapas e apresentação
 
 Karakura e a Loja Urahara usam pisos editáveis no Tiled, apresentação em Phaser e a interface React existente. Veja [como editar e verificar os mapas](docs/world-rendering.md).
