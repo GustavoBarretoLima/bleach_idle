@@ -1,3 +1,5 @@
+import {cityTrees,paintCanopy} from './world/scenery.js';
+import {paintMapGround} from './world/map-data.js';
 import { maps, worldSize, cameraFor, classPaths, mentors } from './data.js';
 import { drawHeroPose } from './sprites.js';
 import { city, cityCamera, decodeCityPosition } from './city.js';
@@ -20,8 +22,8 @@ const mentorActors=mentors.map(mentor=>({...mentor,name:mentor.label,classId:men
 const plazaMentors=mentorActors.filter(mentor=>!mentor.hospital && !mentor.room);
 const hospitalMentors=mentorActors.filter(mentor=>mentor.hospital);
 
-export function createRenderer(world, reducedMotion) {
-  const ctx = world.getContext('2d',{alpha:false});
+export function createRenderer(world, reducedMotion, {separateGround=false, transparentActors=()=>false}={}) {
+  const ctx = world.getContext('2d',{alpha:true});
   ctx.imageSmoothingEnabled = false;
   const { width, height } = world;
   const background = document.createElement('canvas');
@@ -210,13 +212,21 @@ export function createRenderer(world, reducedMotion) {
     ink(bg,'#b3d4c7',exit.x-16,exit.y-3,32,2);
     hospitalLabel(bg,'SAÍDA',exit.x,exit.y-14);
   }
+  let terrainLocation='city';
+  const ground=document.createElement('canvas');
+  ground.width=worldSize.width;ground.height=worldSize.height;
+  const groundContext=ground.getContext('2d');
   function paintTerrain(zone, inPlaza, inHospital, uraharaRoom) {
-    if(uraharaRoom) { paintUrahara(bg,uraharaRoom); return; }
+    terrainLocation=uraharaRoom ?? (inHospital ? 'hospital' : inPlaza ? 'city' : 'district');
+    bg.clearRect(0,0,background.width,background.height);
+    groundContext.clearRect(0,0,ground.width,ground.height);
+    if(separateGround && ['city','shop'].includes(terrainLocation)) paintMapGround(groundContext,terrainLocation);
+    if(uraharaRoom) { paintUrahara(bg,uraharaRoom,{separateGround}); return; }
     if(inHospital) {
       paintHospital();
       return;
     }
-    if(inPlaza) { paintKarakura(bg); return; }
+    if(inPlaza) { paintKarakura(bg,{separateGround}); return; }
     const map=maps[zone];
     ink(bg,map.ground,0,0,worldSize.width,worldSize.height);
     if(map.arena) paintArena(map);
@@ -293,6 +303,12 @@ export function createRenderer(world, reducedMotion) {
     const step=actor.moving&&!reducedMotion.matches ? Math.floor(clock*12)%2 : 0;
     ctx.save();ctx.translate(Math.round(x),Math.round(y));
     ellipse(ctx,'#171a1bc2',0,2,11,4);
+    if(clock<(actor.parryFlashUntil??0)||clock<(actor.defendingUntil??0)){
+      const parry=clock<(actor.parryFlashUntil??0);
+      ctx.strokeStyle=parry?'#a1fff0':'#e6d29b';ctx.lineWidth=parry?3:2;
+      ctx.beginPath();ctx.ellipse(0,-16,parry?21:17,23,0,0,Math.PI*2);ctx.stroke();
+      if(parry){ctx.fillStyle='#a1fff033';ctx.fill();}
+    }
     const frame=mentor ? mentorFrames[actor.classId] : undefined;
     if(frame!==undefined && mentorAtlas.naturalWidth) {
       ctx.drawImage(mentorAtlas,frame*48,0,48,56,-19,-44,38,44);
@@ -397,6 +413,9 @@ export function createRenderer(world, reducedMotion) {
   function monster(enemy,zone,clock,hero) {
     const {x,y,boss,demi,hp,max}=enemy;
     if(hp<=0) return;
+    if(clock<(enemy.stunnedUntil??0)){
+      ctx.font='bold 9px monospace';ctx.textAlign='center';ctx.fillStyle='#a1fff0';ctx.fillText('ATORDOADO',x,y-47);
+    }
     if(enemy.charge) {
       ellipse(ctx,'#eb725b6f',x,y,33,20);
       ellipse(ctx,'#ee9b7652',x,y,24,14);
@@ -472,10 +491,16 @@ export function createRenderer(world, reducedMotion) {
     ctx.fillStyle=actor.mentor ? classPaths[actor.classId].color : isSelf ? '#ffe1a1' : '#a4f0df';
     ctx.fillText(actor.name,x,y);
   }
+  let currentCamera={x:0,y:0};
   function draw({zone,form,classId,hero,enemies,destination,effects,clock,fightAt,inHospital,uraharaRoom,plazaView}) {
     const camera=uraharaRoom==='shop' ? cameraFor(shop.center,width,height) : inHospital ? cameraFor(hospital.center,width,height)
       : (plazaView ? cityCamera : cameraFor)(hero,width,height);
-    ctx.drawImage(background,camera.x,camera.y,width,height,0,0,width,height);
+    currentCamera=camera;
+    ctx.clearRect(0,0,width,height);
+    if(!transparentActors()) {
+      ctx.drawImage(ground,camera.x,camera.y,width,height,0,0,width,height);
+      ctx.drawImage(background,camera.x,camera.y,width,height,0,0,width,height);
+    }
     ctx.save();
     ctx.translate(-camera.x,-camera.y);
     if(destination && !destination.max) {
@@ -483,7 +508,10 @@ export function createRenderer(world, reducedMotion) {
       ellipse(ctx,'#233629',destination.x,destination.y,4,2);
     }
     if(plazaView) {
+      const fallbackCrowns=separateGround && !transparentActors();
+      if(fallbackCrowns) for(const [x,y] of cityTrees) if(y<=hero.y) paintCanopy(ctx,x,y);
       drawPlaza(hero,form,classId,plazaView,clock);
+      if(fallbackCrowns) for(const [x,y] of cityTrees) if(y>hero.y) paintCanopy(ctx,x,y);
       hospitalLabel(ctx,'HOSPITAL',hospital.entrance.x,hospital.entrance.y-32,'#adf4d7');
       hospitalLabel(ctx,'LOJA URAHARA',shop.entrance.x,shop.entrance.y-17,'#f1d9a1');
       lastDraw=clock;
@@ -540,5 +568,5 @@ export function createRenderer(world, reducedMotion) {
     ctx.restore();
   }
 
-  return { paintTerrain, draw };
+  return { paintTerrain, draw, background, getCamera:()=>currentCamera, getLocation:()=>terrainLocation };
 }

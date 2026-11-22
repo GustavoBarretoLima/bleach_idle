@@ -2,6 +2,15 @@
 
 ## Em desenvolvimento
 
+- Combate manual por teclado: J ataca, K defende; parry nos primeiros 180 ms da defesa anula o golpe e atordoa o inimigo por 750 ms.
+- Dez slots de magia com seleção de habilidades aprendidas, atalhos configuráveis, proteção contra conflitos e salvamento no navegador.
+- Barra de combate utilizável por toque, indicação de recarga compartilhada, efeitos de defesa/parry e caça automática opcional.
+
+- Primeira etapa visual de Karakura e Loja Urahara: apresentação em Phaser integrada ao React, pisos em mapas Tiled e reaproveitamento das árvores do Godot.
+- Fachadas, telhados, calçadas, pontes, vitrines, mobiliário e detalhes internos redesenhados; água animada, lanternas e iluminação ambiente leve.
+- Copas em profundidade com transparência perto do jogador, efeitos que respeitam movimento reduzido e apresentação Canvas de contingência.
+- Testes dos mapas, acessos e pontes, além de verificação de navegação em desktop/mobile via Playwright.
+
 - Recuperadas as folhas originais de movimento do Ichigo Shikai, com Zangetsu incorporada às poses de caminhada e corrida e escala proporcional.
 - Ichigo Kurosaki disponível como personagem jogável de teste, iniciando como Shinigami com Shikai e Zangetsu.
 - Partidas existentes recebem o personagem de teste sem perder níveis, itens ou progresso; Bankai já liberada é mantida.

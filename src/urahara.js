@@ -1,3 +1,5 @@
+import {paintMapGround} from './world/map-data.js';
+import {paintShopDetails} from './world/scenery.js';
 // Anime-inspired shop and Study Chamber. Shared geometry drives drawing and collision.
 import { hospital } from './hospital.js';
 export const shop = {
@@ -33,19 +35,18 @@ export function roomWalkable(room,x,y) {
   const obstacles=room==='shop' ? shop.furniture : training.rocks;
   return inside && !obstacles.some(b=>x>b.x-7 && x<b.x+b.width+7 && y>b.y-7 && y<b.y+b.height+7);
 }
-export function paintUrahara(c,room) {
+export function paintUrahara(c,room,{separateGround=false}={}) {
   const r=(color,x,y,w,h)=>{c.fillStyle=color;c.fillRect(x,y,w,h);};
   const label=(text,x,y)=>{c.font='bold 9px monospace';c.textAlign='center';let w=c.measureText(text).width;r('#202c32e8',x-w/2-4,y-10,w+8,14);c.fillStyle='#f6e3b5';c.fillText(text,x,y);};
   const ladder=(x,y)=>{r('#30251e',x-17,y-19,34,38);r('#bd9461',x-13,y-17,4,36);r('#bd9461',x+9,y-17,4,36);for(let n=-12;n<18;n+=7)r('#ddba80',x-10,y+n,20,3);};
   if(room==='shop') {
-    r('#18272c',0,0,1120,640);r('#493a2d',322,174,476,292);r('#a67b51',328,180,464,280);
-    for(let y=215;y<460;y+=12){r(y%24?'#926c48':'#a17a51',335,y,450,11);for(let x=340+(y%24?28:0);x<785;x+=56)r('#715439',x,y,1,11);}
+    if(!separateGround) paintMapGround(c,'shop');
+    r('#493a2d',322,174,476,6);r('#493a2d',322,460,476,6);r('#493a2d',322,180,6,280);r('#493a2d',792,180,6,280);
     r('#d4c5a0',334,186,452,27);r('#634b35',334,210,452,7);
     // Shoji screens and wood beams at the back of the house.
     for(const x of [536,588,640,692,744]){r('#6b5339',x,186,47,27);r('#e4dfc0',x+3,188,41,22);for(let a=8;a<42;a+=10)r('#b59d75',x+a,188,1,22);r('#b59d75',x+3,198,41,1);}
     // Raised tatami room, low tea table, cushions and tea set.
-    r('#65533b',536,309,236,93);
-    for(let y=313;y<390;y+=28) for(let x=540;x<760;x+=57){r('#b3b184',x,y,54,25);for(let n=2;n<25;n+=3)r('#a3a879',x,y+n,54,1);r('#667d60',x,y,3,25);}
+    r('#65533b',536,309,236,4);
     for(const [x,y] of [[587,318],[587,378],[546,346],[652,346]]){r('#686d64',x,y,24,15);r('#8c9880',x+2,y+2,20,11);}
     r('#4f3c2c',568,337,76,34);r('#91623d',566,333,76,29);r('#b88b59',570,336,68,2);
     r('#c7d1b8',594,341,13,10);r('#e9e6cc',600,338,7,6);r('#dce1c9',578,347,5,5);r('#dce1c9',619,347,5,5);
@@ -54,8 +55,9 @@ export function paintUrahara(c,room) {
     r('#674a31',350,263,170,10);r('#c19a63',350,260,170,5);
     // Concealed floor hatch with a real ladder and removable wooden cover.
     r('#6b4f32',695,252,50,48);r('#131d21',699,256,42,40);ladder(720,277);r('#a57f50',749,252,22,44);for(let y=256;y<292;y+=8)r('#6d5238',751,y,18,1);
-    label('SUBSOLO',720,246);label('DOCES E ARTIGOS ESPIRITUAIS',432,204);
+    label('SUBSOLO',720,246);
     r('#d5c5a2',529,425,46,27);for(let x=532;x<575;x+=10)r('#725b42',x,425,2,27);label('KARAKURA',552,455);
+    paintShopDetails(c);
     return;
   }
   // Vast artificial desert below the shop, with a sky-painted cavern roof.

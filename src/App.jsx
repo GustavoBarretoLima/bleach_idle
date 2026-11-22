@@ -1,3 +1,4 @@
+import {CombatBar} from './CombatBar.jsx';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createGame } from './game.js';
@@ -27,12 +28,10 @@ function PatrolControls({ view, game }) {
         <Meter value={view.xp} max={view.goalXp} unit="XP" xp />
       </div>
       <button className={view.auto ? 'button on' : 'button'} aria-pressed={view.auto} onClick={game.toggleHunt}>
-        {view.auto ? 'Caça ativa' : 'Iniciar caça'}
+        {view.auto ? 'Parar caça automática' : 'Ativar caça automática'}
       </button>
     </div>
     <div className="actions">
-      <button className="button skill" disabled={!view.skillReady} onClick={game.useSkill}>{view.skill}</button>
-      <button className="button" disabled={!view.guardReady} onClick={game.defend}>Defender</button>
       <button className="button boss" disabled={!view.bossMode && !view.bossReady} onClick={game.trackBoss}>
         {view.bossMode ? 'Encerrar rastreio' : view.cleared[view.zone] ? 'Chefe purificado' : 'Rastrear chefe'}
       </button>
@@ -241,9 +240,12 @@ function App() {
         </div>
         <div className="viewport">
           <canvas ref={world} width="544" height="306" tabIndex={0} aria-label={view?.inPlaza ? `${locationTitles[view.location]}. Use WASD para andar. Toque numa porta ou escada, ou pressione E perto dela para atravessar.` : 'Mapa de patrulha. Toque ou use WASD para andar.'} />
-          <span className="risk" role="status" hidden={!view?.warning}>{view?.warning}</span>
-          <span className="worldnote">{view?.inPlaza ? 'WASD ou toque · E na porta ou escada' : 'WASD ou toque para andar'}</span>
+          <span className={'risk '+(view?.impactMs>0&&view.impactMs<=180?'parry-window':'')} role="status" hidden={!view?.warning}>{view?.warning}
+            {view?.impactMs>0&&<progress aria-label="Tempo para impacto" value={view.impactMs} max={view.impactDuration} />}
+          </span>
+          <span className="worldnote">{view?.inPlaza ? 'WASD ou toque · E na porta ou escada' : 'WASD · J atacar · K defender · magias nos atalhos'}</span>
         </div>
+        {view && <CombatBar view={view} game={game} />}
         {view && (view.inPlaza && view.location!=='city' ? <MentorDirectory view={view} game={game} />
           : view.inPlaza ? <PlazaControls view={view} game={game} /> : <PatrolControls view={view} game={game} />)}
       </section>
