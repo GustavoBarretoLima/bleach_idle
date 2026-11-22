@@ -1,3 +1,4 @@
+import {drawImprovedShikai} from './ichigo/v2/renderer.js';
 import atlasUrl from './gait-atlas.webp';
 import frames from './gait-frames.json';
 import {drawOriginalIchigoMovement} from './ichigo/movement.js';
@@ -28,6 +29,7 @@ function drawBankaiBlade(ctx, frame, direction, action, phase) {
 }
 
 export function drawHeroPose(ctx, actor, form, clock, fightAt, reducedMotion) {
+  if(form===1&&drawImprovedShikai(ctx,actor,clock,fightAt,reducedMotion))return true;
   const attackElapsed = clock - fightAt;
   const attacking = fightAt > 0 && attackElapsed >= 0 && attackElapsed < swingDuration;
   const action = reducedMotion ? 'idle' : attacking ? 'attack' : actor.moving ? actor.running ? 'run' : 'walk' : 'idle';

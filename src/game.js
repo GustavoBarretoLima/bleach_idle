@@ -323,7 +323,7 @@ export function createGame(world) {
   }
   function receiveAttack(enemy,damage) {
     const result=block?resolveDefense(damage,clock,defenseAt,defenseUntil):{type:'hit',damage};
-    block=false;defenseUntil=-Infinity;hero.defendingUntil=0;
+    block=false;defenseUntil=-Infinity;hero.defendingUntil=0;hero.defenseReleasedAt=clock;
     if(result.type==='parry') {
       enemy.stunnedUntil=clock+combatTiming.stun;
       enemy.swing=Math.max(enemy.swing,enemy.stunnedUntil);
@@ -332,6 +332,7 @@ export function createGame(world) {
       effects.push({x:hero.x,y:hero.y-40,text:'PARRY!',color:'#a1fff0',until:clock+.8});
       log('Parry! Golpe anulado e inimigo atordoado.');
     }else{
+      if(result.type==='block'){hero.guardHitUntil=clock+.16;}
       if(result.type==='block')effects.push({x:hero.x,y:hero.y-40,text:'Defesa',color:'#f8d79c',until:clock+.6});
       hurt(result.damage);
     }
@@ -361,7 +362,7 @@ export function createGame(world) {
   }
   function simulate(dt) {
     clock+=dt;
-    if(block&&clock>defenseUntil){block=false;hero.defendingUntil=0;}
+    if(block&&clock>defenseUntil){block=false;hero.defendingUntil=0;hero.defenseReleasedAt=clock;}
     hero.moving=false;
     hero.running=false;
     effects=effects.filter(effect=>effect.until>clock);
@@ -613,7 +614,7 @@ export function createGame(world) {
   function defend() {
     if(!canDefend())return;
     block=true;defenseAt=clock;defenseUntil=clock+combatTiming.defense;
-    hero.defendingUntil=defenseUntil;
+    hero.defendingUntil=defenseUntil;hero.defenseStartedAt=clock;
     guard=clock+combatTiming.guardCooldown;
     publish();
   }
