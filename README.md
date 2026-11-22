@@ -10,12 +10,16 @@ Não é necessário instalar. Abra o link no computador ou celular.
 
 > Projeto em desenvolvimento. O progresso é salvo no navegador utilizado; limpar os dados do site pode apagar sua partida. O salvamento não é compartilhado entre dispositivos.
 
+## Personagem de teste
+
+Nesta versão, você joga como **Ichigo Kurosaki**, com a classe **Shinigami** e **Shikai/Zangetsu** disponíveis desde o início. O personagem também é aplicado às partidas já salvas, preservando níveis, itens, progresso e Bankai já liberada. A escolha de outras classes fica indisponível enquanto este teste estiver ativo.
+
 ## Primeiros passos
 
-1. Explore Karakura e escolha sua classe com um dos mentores.
-2. Visite a **Loja Urahara** para conversar com Kisuke Urahara e se tornar **Shinigami**.
-3. No **Hospital de Karakura**, converse com **Ryūken** para escolher **Quincy**, com **Sado** para escolher sua classe ou com **Inoue** para escolher a classe Inoue. Ela também pode recuperar seus PV.
-4. Depois de escolher a classe, volte à cidade e inicie uma patrulha pelo menu de distritos.
+1. Explore Karakura com Ichigo ou inicie uma patrulha pelo menu de distritos.
+2. Visite a **Loja Urahara** e explore a câmara subterrânea.
+3. No **Hospital de Karakura**, converse com **Inoue** para recuperar seus PV.
+4. Volte à cidade para visitar os outros locais ou escolher um distrito de patrulha.
 5. Derrote Hollows, distribua pontos de atributo, encontre equipamentos e enfrente chefes para avançar.
 
 A escolha de classe é definitiva para o personagem.

@@ -3,7 +3,7 @@ import { createPresence } from './presence.js';
 import { city, cityCamera, cityWalkable, encodeCityPosition } from './city.js';
 import { hospital, hospitalWalkable } from './hospital.js';
 import { shop, training, locationFor, doorsFor, roomWalkable } from './urahara.js';
-import { maps, loot, drops, forms, powers, key, initial, worldSize, cameraFor, classPaths, mentors } from './data.js';
+import { maps, loot, drops, forms, powers, key, initial, worldSize, cameraFor, classPaths, mentors, testCharacter } from './data.js';
 
 export function createGame(world) {
   let storageOK = true;
@@ -27,6 +27,9 @@ export function createGame(world) {
   const fmt = value => saveNumber.format(value);
   let offlineMessage = '';
   const state = load();
+  // Apply the test character to existing saves without resetting their progress.
+  state.classId = testCharacter.classId;
+  state.form = Math.max(testCharacter.form, state.form ?? 0);
   const classInfo = () => classPaths[state.classId];
   const attackRange = () => classInfo()?.range ?? 27;
   let walkingToMentor = null, activeMentor = null, walkingToDoor = null;
@@ -474,7 +477,7 @@ export function createGame(world) {
       auto:state.auto, bossMode, bossReady:unlockedBoss(), trail:Math.min(state.kills[state.zone],map.goal),
       hp:Math.ceil(hero.hp), maxHp:health(), needsHealing:hero.hp<health(), xp:state.xp, goalXp:need(), reishi:state.reishi,
       level:state.level, attack:attack(), str:state.str, vit:state.vit, points:state.points,
-      classId:state.classId, classInfo:classInfo(), activeMentor, walkingToMentor:walkingToMentor?.id,
+      characterName:testCharacter.name, classId:state.classId, classInfo:classInfo(), activeMentor, walkingToMentor:walkingToMentor?.id,
       form:state.classId==='shinigami' ? forms[state.form] : null, nextForm:['Shikai','Bankai','Liberado'][state.form],
       formHint:['Nível 4 e chefe de Karakura','Nível 9 e chefe do Distrito do Vapor','Liberação máxima'][state.form],
       releaseReady:canRelease(), skill:(state.form ? powers[state.form] : classInfo()?.skill ?? powers[0])+(remaining?' · '+remaining+'s':''),
