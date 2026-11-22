@@ -68,3 +68,10 @@
 @media(max-width:400px){.hospital-door{font-size:12px;padding-inline:7px}}
 
 .mentor-vitals {color:var(--teal);font-weight:700;margin:0 0 10px}
+
+.location-doors { display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; }
+.location-doors .button { white-space:normal; }
+@media(max-width:600px) {
+  .location-doors { width:100%; justify-content:stretch; }
+  .location-doors .button { flex:1 1 145px; }
+}
