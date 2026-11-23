@@ -2,7 +2,7 @@ import {selectShikaiPose} from '../v2/pose.js';
 
 const sheet = new Image();
 sheet.src = new URL('./shikai.png', import.meta.url).href;
-const columns = {down:0, left:1, up:2, right:3};
+const columns = {up:0, right:1, down:2, left:3};
 const bearings = {down:Math.PI/2, left:Math.PI, up:-Math.PI/2, right:0};
 
 export function drawLobotsShikai(ctx, actor, clock, fightAt, reducedMotion=false, texture=sheet) {

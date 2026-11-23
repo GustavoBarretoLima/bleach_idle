@@ -6,7 +6,7 @@ const texture={complete:true,naturalWidth:128};
 function context(){return {images:[],save(){},restore(){},translate(){},drawImage(...args){this.images.push(args);},beginPath(){},arc(){},stroke(){},moveTo(){},lineTo(){}};}
 
 test('LOBOTS uses four distinct direction columns and all steps without bending the sword',()=>{
-  for(const [column,direction] of ['down','left','up','right'].entries()){
+  for(const [column,direction] of ['up','right','down','left'].entries()){
     const rows=new Set();
     for(const gaitTime of [0,.15,.29,.43]){
       const ctx=context();
