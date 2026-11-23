@@ -2,6 +2,10 @@
 
 ## Em desenvolvimento
 
+- Ichigo Shikai usa a folha do Legend of Bleach (LOBOTS), com quatro direções sem espelhamento, caminhada e corrida em escala uniforme.
+- Ataque, defesa e parry adaptados à mesma folha para evitar mudanças de estilo entre ações; espada e cabo permanecem unidos na textura original.
+- Origem e limitações da arte de terceiros documentadas em `src/ichigo/lobots/README.md`.
+
 - Corrigida a animação de ataque do Ichigo Shikai: arco de corte mais curto por direção, preparação, impacto e recuperação antes de voltar ao ombro.
 - Corrigidos os pontos de encaixe do cabo nos punhos dos quadros de impacto de frente, costas e direita.
 - Zangetsu permanece ancorada à mão e passa atrás do corpo na preparação/retorno; rastro breve indica a direção do golpe.
