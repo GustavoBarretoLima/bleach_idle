@@ -26,15 +26,15 @@ export function drawLobotsShikai(ctx, actor, clock, fightAt, reducedMotion=false
   if (pose.action==='attack' && pose.attackAge>=.08 && pose.attackAge<.21 && !reducedMotion) {
     ctx.globalAlpha=(1-(pose.attackAge-.08)/.13)*.7;
     ctx.strokeStyle='#edf6ff';ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.arc(0,-15,22,bearing-.55,bearing+.55);ctx.stroke();
+    ctx.beginPath();ctx.arc(0,-15,16,bearing-.55,bearing+.55);ctx.stroke();
   }
   if (['guard','block','parry'].includes(pose.action)) {
     ctx.globalAlpha=pose.action==='parry' ? .95 : .7;
     ctx.strokeStyle=pose.action==='parry' ? '#b6fff1' : '#e6d29b';
     ctx.lineWidth=pose.action==='parry' ? 2 : 1.5;
-    ctx.beginPath();ctx.arc(0,-15,23,bearing-.65,bearing+.65);ctx.stroke();
+    ctx.beginPath();ctx.arc(0,-15,17,bearing-.65,bearing+.65);ctx.stroke();
     if (pose.action==='parry') {
-      const x=Math.cos(bearing)*22,y=-15+Math.sin(bearing)*22;
+      const x=Math.cos(bearing)*17,y=-15+Math.sin(bearing)*17;
       for(let i=0;i<6;i++) {
         const angle=i*Math.PI/3;
         ctx.beginPath();ctx.moveTo(x+Math.cos(angle)*3,y+Math.sin(angle)*3);

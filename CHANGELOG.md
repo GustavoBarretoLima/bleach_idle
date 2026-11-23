@@ -2,6 +2,9 @@
 
 ## Em desenvolvimento
 
+- Corrigida a folha do Ichigo LOBOTS: Shikai sem máscara e com Zangetsu larga (arquivo `ichigo-form-2.png` da galeria), substituindo a forma mascarada de espada fina usada por engano.
+- Indicadores de corte e guarda aproximados do personagem para reduzir a separação visual em relação à espada.
+
 - Ichigo Shikai usa a folha do Legend of Bleach (LOBOTS), com quatro direções sem espelhamento, caminhada e corrida em escala uniforme.
 - Ataque, defesa e parry adaptados à mesma folha para evitar mudanças de estilo entre ações; espada e cabo permanecem unidos na textura original.
 - Origem e limitações da arte de terceiros documentadas em `src/ichigo/lobots/README.md`.

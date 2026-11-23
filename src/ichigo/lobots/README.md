@@ -1,7 +1,9 @@
 # Ichigo Shikai — Legend of Bleach
 
+The gallery names are not transformation levels: `ichigo-form-2.png` is the unmasked Shikai with the broad Zangetsu; `ichigo-form-1.png` depicts a masked form with a thin blade.
+
 `shikai.png` is the unmodified 128×96 PNG published in the Legend of Bleach gallery:
-https://lobots.pl/gallery/images/outfits/ichigo-form-1.png
+https://lobots.pl/gallery/images/outfits/ichigo-form-2.png
 
 Gallery: https://lobots.pl/index.php?subtopic=gallery
 Client source: https://lobots.pl/index.php?subtopic=downloads
